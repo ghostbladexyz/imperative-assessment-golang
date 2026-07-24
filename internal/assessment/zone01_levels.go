@@ -477,7 +477,7 @@ func zone01Levels() []Level {
 
 	levels := make([]Level, 0, len(specs))
 	for _, spec := range specs {
-		levels = append(levels, makePracticeLevel(spec))
+		levels = append(levels, compilePracticeExercise(sourceZone01, spec))
 	}
 	return levels
 }

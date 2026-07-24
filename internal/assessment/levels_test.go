@@ -11,24 +11,24 @@ func TestDefinitionsAreComplete(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, level := range Levels() {
-		if level.Title == "" || level.Signature == "" || level.StarterCode == "" {
-			t.Fatalf("level %d is missing core metadata", level.ID)
+		if level.Key == "" || level.Title == "" || level.Signature == "" || level.StarterCode == "" {
+			t.Fatalf("exercise %q is missing core metadata", level.Key)
 		}
 		if !strings.HasPrefix(level.StarterCode, "package main\n") {
-			t.Fatalf("level %d starter code must include an editable package declaration", level.ID)
+			t.Fatalf("exercise %q starter code must include an editable package declaration", level.Key)
 		}
 		if len(level.Instructions.Hints) < 3 {
-			t.Fatalf("level %d has fewer than three hints", level.ID)
+			t.Fatalf("exercise %q has fewer than three hints", level.Key)
 		}
 		if len(level.Instructions.Examples) < 4 {
-			t.Fatalf("level %d has fewer than four examples", level.ID)
+			t.Fatalf("exercise %q has fewer than four examples", level.Key)
 		}
 		if len(level.Instructions.AllowedBuiltins) == 0 ||
 			len(level.Instructions.AllowedPackages) == 0 {
-			t.Fatalf("level %d has no explicit source policy", level.ID)
+			t.Fatalf("exercise %q has no explicit source policy", level.Key)
 		}
 		if harness := level.BuildHarness(level.Tests[:1]); harness == "" {
-			t.Fatalf("level %d generated an empty harness", level.ID)
+			t.Fatalf("exercise %q generated an empty harness", level.Key)
 		}
 	}
 }
@@ -44,28 +44,10 @@ func TestPublicLevelsDoNotExposeHarnesses(t *testing.T) {
 
 func TestZone01CatalogueRemainsComplete(t *testing.T) {
 	t.Parallel()
-	levels := Levels()
-	wantTitles := []string{
-		"Only A", "Print If Not", "Print If", "Rectangle Perimeter",
-		"Count Character", "Check Number", "Retain First Half", "Count Alpha",
-		"First Word", "Last Word", "Fish And Chips", "Digit Length",
-		"Search Replace", "Repeat Alpha", "Greatest Common Divisor",
-		"Camel To Snake Case", "Hash Code", "Third Time Is A Charm", "From To",
-		"Is Capitalized", "Find Previous Prime", "Integer To ASCII",
-		"Clean String", "Expand String", "We Are Unique", "Zip String",
-		"Print Reverse Combo", "Print Memory", "Concat Slice", "Save And Miss",
-		"Hidden P", "Word Match", "Intersection", "Union", "Concat Alternate",
-		"Chunk", "Reverse String Capitalization", "Can Jump", "Add Prime Sum",
-		"Prime Factors", "Fifth And Skip", "Reverse Concat Alternate",
-		"Not Decimal", "Slice",
-	}
-	available := make(map[string]bool, len(levels))
-	for _, level := range levels {
-		available[level.Title] = true
-	}
-	for _, want := range wantTitles {
-		if !available[want] {
-			t.Errorf("missing Zone01 exercise %q", want)
+	for sourceID := 22; sourceID <= 65; sourceID++ {
+		key := exerciseKey(sourceZone01, sourceID)
+		if _, found := FindExercise(key); !found {
+			t.Errorf("missing Zone01 exercise %q", key)
 		}
 	}
 }
@@ -99,7 +81,7 @@ func TestImportedExercisesIncreaseInDifficulty(t *testing.T) {
 	levels := Levels()
 	previous := 0
 	for _, level := range levels[21:] {
-		current := importedDifficultyRank(level.Difficulty)
+		current := level.order
 		if current < previous {
 			t.Fatalf("%q (%s) appears after a harder exercise", level.Title, level.Difficulty)
 		}
@@ -107,14 +89,31 @@ func TestImportedExercisesIncreaseInDifficulty(t *testing.T) {
 	}
 }
 
-func TestCatalogueHasNoDuplicateTitles(t *testing.T) {
+func TestCatalogueLookupUsesStableKeysAndFrozenLegacyPositions(t *testing.T) {
 	t.Parallel()
-	seen := make(map[string]int, exerciseCount)
-	for _, level := range Levels() {
-		if previous, found := seen[level.Title]; found {
-			t.Fatalf("duplicate title %q at exercises %d and %d", level.Title, previous, level.ID)
+	levels := Levels()
+	legacy := LegacyExerciseKeys()
+	if len(legacy) != len(levels) {
+		t.Fatalf("got %d legacy keys, want %d", len(legacy), len(levels))
+	}
+	for index, level := range levels {
+		byKey, found := FindExercise(level.Key)
+		if !found || byKey.ID != level.ID {
+			t.Fatalf("key lookup for %q returned %#v", level.Key, byKey)
 		}
-		seen[level.Title] = level.ID
+		byPosition, found := FindLevel(index + 1)
+		if !found || byPosition.Key != level.Key {
+			t.Fatalf("position lookup %d returned %#v", index+1, byPosition)
+		}
+	}
+	for position, want := range map[int]ExerciseKey{
+		1: "foundation/1", 22: "piscine/1001", 40: "zone01/22",
+		171: "zone01/65",
+	} {
+		key, found := LegacyExerciseKey(position)
+		if !found || key != want {
+			t.Fatalf("legacy position %d maps to %q, want %q", position, key, want)
+		}
 	}
 }
 
@@ -122,5 +121,20 @@ func TestKinoz01CatalogueAddsOneHundredAndSixUniqueExercises(t *testing.T) {
 	t.Parallel()
 	if got := len(piscineLevels()); got != 106 {
 		t.Fatalf("got %d kinoz01 exercises, want 106", got)
+	}
+}
+
+func TestCatalogueReturnsDefensiveProjections(t *testing.T) {
+	t.Parallel()
+	first := Levels()
+	first[0].Title = "changed"
+	first[0].Tests[0].Name = "changed"
+	first[0].Instructions.Hints[0] = "changed"
+
+	second := Levels()
+	if second[0].Title == "changed" ||
+		second[0].Tests[0].Name == "changed" ||
+		second[0].Instructions.Hints[0] == "changed" {
+		t.Fatal("caller mutation changed the cached catalogue")
 	}
 }

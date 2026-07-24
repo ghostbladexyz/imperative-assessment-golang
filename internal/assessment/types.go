@@ -1,5 +1,7 @@
 package assessment
 
+type ExerciseKey string
+
 type DocumentationLink struct {
 	Label string `json:"label"`
 	URL   string `json:"url"`
@@ -38,16 +40,21 @@ type VisibleTest struct {
 }
 
 type Level struct {
-	ID           int           `json:"id"`
-	Title        string        `json:"title"`
-	Topic        string        `json:"topic"`
-	Difficulty   string        `json:"difficulty"`
-	Stretch      bool          `json:"stretch"`
-	Signature    string        `json:"signature"`
-	StarterCode  string        `json:"starterCode"`
-	Instructions Instructions  `json:"instructions"`
-	Tests        []VisibleTest `json:"tests"`
-	build        func([]VisibleTest) string
+	Key           ExerciseKey   `json:"key"`
+	ID            int           `json:"id"`
+	Title         string        `json:"title"`
+	Topic         string        `json:"topic"`
+	Difficulty    string        `json:"difficulty"`
+	Stretch       bool          `json:"stretch"`
+	Signature     string        `json:"signature"`
+	StarterCode   string        `json:"starterCode"`
+	Instructions  Instructions  `json:"instructions"`
+	Tests         []VisibleTest `json:"tests"`
+	build         func([]VisibleTest) string
+	source        exerciseSource
+	sourceID      int
+	order         int
+	definitionErr error
 }
 
 func (level Level) BuildHarness(tests []VisibleTest) string {
@@ -55,7 +62,7 @@ func (level Level) BuildHarness(tests []VisibleTest) string {
 }
 
 func PublicLevels() []Level {
-	levels := Levels()
+	levels := catalogueLevels()
 	for index := range levels {
 		levels[index].build = nil
 	}
@@ -81,10 +88,17 @@ func SelectTests(level Level, ids []string) ([]VisibleTest, bool) {
 }
 
 func FindLevel(id int) (Level, bool) {
-	for _, level := range Levels() {
-		if level.ID == id {
-			return level, true
-		}
-	}
-	return Level{}, false
+	return catalogueFindPosition(id)
+}
+
+func FindExercise(key ExerciseKey) (Level, bool) {
+	return catalogueFindKey(key)
+}
+
+func LegacyExerciseKey(position int) (ExerciseKey, bool) {
+	return catalogueLegacyKey(position)
+}
+
+func LegacyExerciseKeys() []ExerciseKey {
+	return catalogueLegacyKeys()
 }

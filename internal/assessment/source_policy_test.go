@@ -7,7 +7,7 @@ import (
 
 func TestSourcePolicyAcceptsDocumentedBuiltinsAndPackages(t *testing.T) {
 	t.Parallel()
-	level := findLevelByTitle(t, "Concat Slice")
+	level := mustFindExercise(t, "zone01/50")
 	source := `package main
 
 import "fmt"
@@ -26,7 +26,7 @@ func ConcatSlice(left, right []int) []int {
 
 func TestSourcePolicyRejectsUnlistedBuiltin(t *testing.T) {
 	t.Parallel()
-	level := findLevelByTitle(t, "Concat Slice")
+	level := mustFindExercise(t, "zone01/50")
 	source := `package main
 func ConcatSlice(left, right []int) []int {
 	values := []int{}
@@ -41,7 +41,7 @@ func ConcatSlice(left, right []int) []int {
 
 func TestSourcePolicyRejectsAliasedUnlistedBuiltin(t *testing.T) {
 	t.Parallel()
-	level := findLevelByTitle(t, "Concat Slice")
+	level := mustFindExercise(t, "zone01/50")
 	source := `package main
 func ConcatSlice(left, right []int) []int {
 	forbidden := copy
@@ -57,7 +57,7 @@ func ConcatSlice(left, right []int) []int {
 
 func TestSourcePolicyRejectsUnlistedPackage(t *testing.T) {
 	t.Parallel()
-	level := findLevelByTitle(t, "Concat Slice")
+	level := mustFindExercise(t, "zone01/50")
 	source := `package main
 import "regexp"
 func ConcatSlice(left, right []int) []int {
@@ -70,13 +70,11 @@ func ConcatSlice(left, right []int) []int {
 	}
 }
 
-func findLevelByTitle(t *testing.T, title string) Level {
+func mustFindExercise(t *testing.T, key ExerciseKey) Level {
 	t.Helper()
-	for _, level := range Levels() {
-		if level.Title == title {
-			return level
-		}
+	level, found := FindExercise(key)
+	if !found {
+		t.Fatalf("missing exercise %q", key)
 	}
-	t.Fatalf("missing level %q", title)
-	return Level{}
+	return level
 }
