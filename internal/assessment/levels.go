@@ -506,7 +506,14 @@ func levelSeven() Level {
 		"A sentinel for invalid worker counts and the required function are supplied.",
 	)
 	instructions.Constraints = []string{"workers <= 0 returns ErrInvalidWorkers.", "Empty input returns []int{} without calling fn.", "Do not leak goroutines.", "Preserve the original function error so errors.Is works.", "Do not spawn one unbounded goroutine per item."}
-	instructions.Examples = []Example{{Input: `inputs [3,1,2], workers 2, fn doubles`, Output: `[6,2,4]`}, {Input: `workers 0`, Output: `error matching ErrInvalidWorkers`}}
+	instructions.Examples = []Example{
+		{Input: `inputs [3,1,2], workers 2, fn doubles`, Output: `[]int{6,2,4}, nil`},
+		{Input: `inputs [], workers 3`, Output: `[]int{}, nil; fn is never called`},
+		{Input: `inputs [1], workers 0`, Output: `nil, error matching ErrInvalidWorkers`},
+		{Input: `fn fails for the second job`, Output: `nil, the original fn error after all workers stop`},
+		{Input: `context is cancelled`, Output: `nil, context.Canceled`},
+	}
+	setSourcePolicy(&instructions, []string{"append", "close", "len", "make"}, []string{"context", "errors", "fmt", "sync"})
 	instructions.Documentation = []DocumentationLink{{Label: "context", URL: "https://pkg.go.dev/context"}, {Label: "sync.WaitGroup", URL: "https://pkg.go.dev/sync#WaitGroup"}, {Label: "Go pipelines", URL: "https://go.dev/blog/pipelines"}}
 	instructions.Hints = []string{"Create a child context you can cancel on the first error.", "Send indexed jobs through a channel to a fixed number of workers.", "Close jobs, wait for every worker, then prefer the first worker error over context cancellation."}
 	instructions.CommonPitfalls = []string{"Appending results in completion order", "Returning before workers stop", "Losing the original error behind context.Canceled"}
