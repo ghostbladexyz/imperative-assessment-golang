@@ -12,10 +12,15 @@ func baseInstructions(objective, contract, input, output, starter string) Instru
 		Input:           input,
 		Output:          output,
 		StarterNote:     starter,
-		Allowed:         []string{"Any Go standard-library package unless specifically restricted."},
-		Disallowed:      []string{"Third-party packages", "Network access", "Changing the required API signature"},
+		Allowed:         []string{"User-defined helper functions and types", "Ordinary operators, loops, conditionals, goroutines, channels, and composite literals required by the task"},
+		Disallowed:      []string{"Any package or Go built-in not listed for this exercise", "Third-party packages", "Network access", "Changing the required API signature"},
 		WhitespaceRules: "Expected values use exact JSON or exact text comparison. Line endings are normalized; other whitespace is significant unless the task says otherwise.",
 	}
+}
+
+func setSourcePolicy(instructions *Instructions, builtins, packages []string) {
+	instructions.AllowedBuiltins = append([]string{"print", "println"}, builtins...)
+	instructions.AllowedPackages = append([]string(nil), packages...)
 }
 
 func test(id, name, purpose, input, expected string, payload any) VisibleTest {
@@ -45,7 +50,13 @@ func levelOne() Level {
 		"The editor starts nearly blank with the required signature.",
 	)
 	instructions.Constraints = []string{"Use loops and basic string/rune handling.", "ASCII A-Z becomes a-z.", "An empty result must be []string{}, not nil.", "Do not use regular expressions."}
-	instructions.Examples = []Example{{Input: `"Go, GO! 101"`, Output: `["go","go","101"]`}, {Input: `"  one--two  "`, Output: `["one","two"]`}}
+	instructions.Examples = []Example{
+		{Input: `NormalizeTokens("Go, GO! 101")`, Output: `[]string{"go","go","101"}`},
+		{Input: `NormalizeTokens("  one--two  ")`, Output: `[]string{"one","two"}`},
+		{Input: `NormalizeTokens("snake_case caféGo")`, Output: `[]string{"snake","case","caf","go"}`},
+		{Input: `NormalizeTokens("---")`, Output: `[]string{}`},
+	}
+	setSourcePolicy(&instructions, []string{"append", "len", "make"}, []string{"fmt", "strings"})
 	instructions.Documentation = []DocumentationLink{{Label: "strings package", URL: "https://pkg.go.dev/strings"}, {Label: "Unicode rune basics", URL: "https://go.dev/blog/strings"}}
 	instructions.Disallowed = append(instructions.Disallowed, "regexp")
 	instructions.Hints = []string{"Build the current token one rune at a time.", "Flush a token whenever a rune is not ASCII alphanumeric.", "A small helper can lowercase A-Z by arithmetic, or strings.ToLower can normalize a completed token."}
