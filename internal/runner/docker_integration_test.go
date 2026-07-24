@@ -30,6 +30,13 @@ func TestDockerRunnerIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	level, _ := assessment.FindLevel(1)
+	isolationLevel := level
+	isolationLevel.Instructions.AllowedPackages = append(
+		append([]string(nil), level.Instructions.AllowedPackages...),
+		"net",
+		"os",
+		"time",
+	)
 
 	t.Run("correct solution passes", func(t *testing.T) {
 		result := sandbox.Run(context.Background(), level, correctLevelOneSolution, nil)
@@ -101,7 +108,7 @@ func TestDockerRunnerIntegration(t *testing.T) {
 	t.Run("external network is unavailable", func(t *testing.T) {
 		result := sandbox.Run(
 			context.Background(),
-			level,
+			isolationLevel,
 			`import (
 	"net"
 	"time"
@@ -125,7 +132,7 @@ func NormalizeTokens(input string) []string {
 	t.Run("container root is read only", func(t *testing.T) {
 		result := sandbox.Run(
 			context.Background(),
-			level,
+			isolationLevel,
 			`import "os"
 func NormalizeTokens(input string) []string {
 	if os.WriteFile("/root-write-probe", []byte("unsafe"), 0600) == nil {
@@ -144,7 +151,7 @@ func NormalizeTokens(input string) []string {
 	t.Run("host files are not mounted", func(t *testing.T) {
 		result := sandbox.Run(
 			context.Background(),
-			level,
+			isolationLevel,
 			`import "os"
 func NormalizeTokens(input string) []string {
 	if _, err := os.ReadFile("/imperative-assessment-host-probe"); err == nil {
