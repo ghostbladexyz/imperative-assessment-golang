@@ -9,10 +9,11 @@ import (
 // Duplicate solution variants and exercises already represented elsewhere in
 // the curriculum are intentionally omitted.
 func piscineLevels() []Level {
-	specs := make([]practiceSpec, 0, 56)
+	specs := make([]practiceSpec, 0, 75)
 specs = append(specs, piscineQuestTwoSpecs()...)
 specs = append(specs, piscineQuestThreeAndFourSpecs()...)
 specs = append(specs, piscineQuestFiveSpecs()...)
+specs = append(specs, piscineQuestSixAndSevenSpecs()...)
 
 	levels := make([]Level, 0, len(specs))
 	for _, spec := range specs {
@@ -370,6 +371,166 @@ func piscineQuestFiveSpecs() []practiceSpec {
 			"Transform one word using the piscine Pig Latin rules.", "One lowercase ASCII word.", "Append \"ay\" after an initial vowel; otherwise move the leading consonant cluster and append \"ay\".",
 			[]string{"len"}, stringField, "PigLatin(current.Payload.Value)", `""`,
 			stringCases([]string{"", "apple", "pig", "smile", "rhythm"}, []string{"", "appleay", "igpay", "ilesmay", "No vowels"})),
+	}
+}
+
+func piscineQuestSixAndSevenSpecs() []practiceSpec {
+	return []practiceSpec{
+		piscineSpec(1057, "Parameter Count", "Piscine Quest 6", "ParamCount(arguments []string) int",
+			"Count the command-line arguments supplied to a program.", "A slice containing arguments, without the program name.", "The number of arguments.",
+			[]string{"len"}, stringsField, "ParamCount(current.Payload.Values)", `0`,
+			[]practiceCase{
+				stringsIntCase("None", []string{}, 0),
+				stringsIntCase("One", []string{"go"}, 1),
+				stringsIntCase("Several", []string{"go", "is", "fun"}, 3),
+			}),
+		piscineSpec(1058, "First Parameter", "Piscine Quest 6", "FirstParam(arguments []string) string",
+			"Return the first command-line argument.", "A slice containing arguments, without the program name.", "The first argument followed by newline, or newline when none exists.",
+			[]string{"len"}, stringsField, "FirstParam(current.Payload.Values)", `"\n"`,
+			[]practiceCase{
+				stringsOutputCase("None", []string{}, "\n"),
+				stringsOutputCase("One", []string{"go"}, "go\n"),
+				stringsOutputCase("Several", []string{"first", "last"}, "first\n"),
+			}),
+		piscineSpec(1059, "Last Parameter", "Piscine Quest 6", "LastParam(arguments []string) string",
+			"Return the final command-line argument.", "A slice containing arguments, without the program name.", "The last argument followed by newline, or newline when none exists.",
+			[]string{"len"}, stringsField, "LastParam(current.Payload.Values)", `"\n"`,
+			[]practiceCase{
+				stringsOutputCase("None", []string{}, "\n"),
+				stringsOutputCase("One", []string{"go"}, "go\n"),
+				stringsOutputCase("Several", []string{"first", "last"}, "last\n"),
+			}),
+		piscineSpec(1060, "Print Parameters", "Piscine Quest 6", "PrintParams(arguments []string) string",
+			"Format command-line arguments in their original order.", "A slice containing arguments, without the program name.", "Every argument on its own line.",
+			nil, stringsField, "PrintParams(current.Payload.Values)", `""`,
+			[]practiceCase{
+				stringsOutputCase("None", []string{}, ""),
+				stringsOutputCase("One", []string{"go"}, "go\n"),
+				stringsOutputCase("Several", []string{"go", "lang"}, "go\nlang\n"),
+			}),
+		piscineSpec(1061, "Reverse Parameters", "Piscine Quest 6", "ReverseParams(arguments []string) string",
+			"Format command-line arguments from last to first.", "A slice containing arguments, without the program name.", "Every argument on its own line in reverse order.",
+			[]string{"len"}, stringsField, "ReverseParams(current.Payload.Values)", `""`,
+			[]practiceCase{
+				stringsOutputCase("None", []string{}, ""),
+				stringsOutputCase("One", []string{"go"}, "go\n"),
+				stringsOutputCase("Several", []string{"one", "two", "three"}, "three\ntwo\none\n"),
+			}),
+		piscineSpec(1062, "Sort Parameters", "Piscine Quest 6", "SortParams(arguments []string) []string",
+			"Sort command-line arguments by ascending ASCII order.", "A slice containing arguments, without the program name.", "A new sorted slice.",
+			[]string{"append", "len"}, stringsField, "SortParams(current.Payload.Values)", `nil`,
+			[]practiceCase{
+				stringsSliceCase("None", []string{}, []string{}),
+				stringsSliceCase("Mixed", []string{"z", "a", "m"}, []string{"a", "m", "z"}),
+				stringsSliceCase("Case-sensitive", []string{"a", "B", "A"}, []string{"A", "B", "a"}),
+			}),
+		piscineSpec(1063, "Number Convert Alpha", "Piscine Quest 6", "NbrConvertAlpha(values []int, upper bool) string",
+			"Convert numbers 1 through 26 into alphabet letters.", "Integer values and a case flag.", "Letters for valid values; invalid values become spaces. Append newline.",
+			nil, intsBoolFields, "NbrConvertAlpha(current.Payload.Values, current.Payload.Upper)", `"\n"`,
+			[]practiceCase{
+				intsBoolStringCase("Lowercase", []int{8, 5, 12, 12, 15}, false, "hello\n"),
+				intsBoolStringCase("Uppercase", []int{7, 15}, true, "GO\n"),
+				intsBoolStringCase("Invalid", []int{1, 0, 26, 27}, false, "a z \n"),
+			}),
+		piscineSpec(1064, "Program Name", "Piscine Quest 6", "ProgramName(name string) string",
+			"Format the executable name as the piscine program would print it.", "One program name.", "The name followed by newline.",
+			nil, stringField, "ProgramName(current.Payload.Value)", `"\n"`,
+			stringCases([]string{"main", "./app", "go-task"}, []string{"main\n", "./app\n", "go-task\n"})),
+		piscineSpec(1065, "Flags", "Piscine Quest 6", "ApplyFlags(value string, insert string, order bool) string",
+			"Apply insert and order flags to a string.", "A value, optional text to append, and an order flag.", "The transformed string followed by newline.",
+			[]string{"len"}, flagsFields, "ApplyFlags(current.Payload.Value, current.Payload.Insert, current.Payload.Order)", `"\n"`,
+			[]practiceCase{
+				flagsCase("Unchanged", "go", "", false, "go\n"),
+				flagsCase("Insert", "go", "lang", false, "golang\n"),
+				flagsCase("Order", "dcba", "", true, "abcd\n"),
+				flagsCase("Both", "dc", "ba", true, "abcd\n"),
+			}),
+		piscineSpec(1066, "Append Range", "Piscine Quest 7", "AppendRange(minimum int, maximum int) []int",
+			"Build an ascending half-open integer range using append.", "Two integer bounds.", "All integers from minimum through maximum-1; empty when minimum is not smaller.",
+			[]string{"append"}, minMaxFields, "AppendRange(current.Payload.Minimum, current.Payload.Maximum)", `[]int{}`,
+			[]practiceCase{
+				rangeCase("Positive", 1, 4, []int{1, 2, 3}),
+				rangeCase("Across zero", -2, 2, []int{-2, -1, 0, 1}),
+				rangeCase("Equal", 3, 3, []int{}),
+				rangeCase("Descending", 4, 1, []int{}),
+			}),
+		piscineSpec(1067, "Make Range", "Piscine Quest 7", "MakeRange(minimum int, maximum int) []int",
+			"Build an ascending half-open integer range using make.", "Two integer bounds.", "All integers from minimum through maximum-1; nil when minimum is not smaller.",
+			[]string{"make"}, minMaxFields, "MakeRange(current.Payload.Minimum, current.Payload.Maximum)", `nil`,
+			[]practiceCase{
+				rangeCase("Positive", 1, 4, []int{1, 2, 3}),
+				rangeCase("Across zero", -2, 2, []int{-2, -1, 0, 1}),
+				rangeNilCase("Equal", 3, 3),
+				rangeNilCase("Descending", 4, 1),
+			}),
+		piscineSpec(1068, "Add Front", "Piscine Quest 7", "AddFront(value string, values []string) []string",
+			"Insert a non-empty string at the front of a slice.", "A value and string slice.", "The prefixed slice; an empty value leaves the slice unchanged.",
+			[]string{"append", "len", "make"}, valueStringsFields, "AddFront(current.Payload.Value, current.Payload.Values)", `nil`,
+			[]practiceCase{
+				valueStringsCase("Empty slice", "go", []string{}, []string{"go"}),
+				valueStringsCase("Existing", "go", []string{"lang"}, []string{"go", "lang"}),
+				valueStringsCase("Empty value", "", []string{"go"}, []string{"go"}),
+			}),
+		piscineSpec(1069, "Concatenate Parameters", "Piscine Quest 7", "ConcatParams(arguments []string) string",
+			"Join command-line arguments with newline separators.", "A string slice.", "Arguments separated by newline, without a trailing newline.",
+			[]string{"len"}, stringsField, "ConcatParams(current.Payload.Values)", `""`,
+			[]practiceCase{
+				stringsOutputCase("None", []string{}, ""),
+				stringsOutputCase("One", []string{"go"}, "go"),
+				stringsOutputCase("Several", []string{"go", "lang"}, "go\nlang"),
+			}),
+		piscineSpec(1070, "Split Whitespace", "Piscine Quest 7", "SplitWhiteSpaces(value string) []string",
+			"Split a string on spaces, tabs, and newlines.", "One string.", "Non-empty words in encounter order.",
+			[]string{"append", "len"}, stringField, "SplitWhiteSpaces(current.Payload.Value)", `nil`,
+			[]practiceCase{
+				stringSliceCase("Empty", "", []string{}),
+				stringSliceCase("Spaces", "  go   lang ", []string{"go", "lang"}),
+				stringSliceCase("Mixed", "go\tis\nfun", []string{"go", "is", "fun"}),
+			}),
+		piscineSpec(1071, "Split", "Piscine Quest 7", "Split(value string, separator string) []string",
+			"Split a string at each exact separator occurrence.", "A string and non-empty separator.", "All fields, including empty fields at the edges.",
+			[]string{"append", "len"}, valueSeparatorFields, "Split(current.Payload.Value, current.Payload.Separator)", `nil`,
+			[]practiceCase{
+				splitCase("No match", "golang", ",", []string{"golang"}),
+				splitCase("Several", "go,is,fun", ",", []string{"go", "is", "fun"}),
+				splitCase("Edges", ",go,", ",", []string{"", "go", ""}),
+				splitCase("Wide separator", "a--b", "--", []string{"a", "b"}),
+			}),
+		piscineSpec(1072, "Print Words Tables", "Piscine Quest 7", "PrintWordsTables(values []string) string",
+			"Format every word from a table on its own line.", "A string slice.", "Every element followed by newline.",
+			nil, stringsField, "PrintWordsTables(current.Payload.Values)", `""`,
+			[]practiceCase{
+				stringsOutputCase("Empty", []string{}, ""),
+				stringsOutputCase("One", []string{"go"}, "go\n"),
+				stringsOutputCase("Several", []string{"go", "lang"}, "go\nlang\n"),
+			}),
+		piscineSpec(1073, "Convert Base", "Piscine Quest 7", "ConvertBase(value string, fromBase string, toBase string) string",
+			"Convert a valid integer representation between custom bases.", "A number and two valid digit alphabets.", "The equivalent representation in the target base.",
+			[]string{"len"}, convertBaseFields, "ConvertBase(current.Payload.Value, current.Payload.FromBase, current.Payload.ToBase)", `""`,
+			[]practiceCase{
+				convertBaseCase("Binary to decimal", "1010", "01", "0123456789", "10"),
+				convertBaseCase("Decimal to hex", "255", "0123456789", "0123456789abcdef", "ff"),
+				convertBaseCase("Negative", "-10", "0123456789", "01", "-1010"),
+				convertBaseCase("Zero", "0", "0123456789", "01", "0"),
+			}),
+		piscineSpec(1074, "Atoi Base", "Piscine Quest 7", "AtoiBase(value string, base string) int",
+			"Parse a signed integer using a custom base alphabet.", "A number and valid digit alphabet.", "Its base-10 integer value.",
+			[]string{"len"}, valueBaseFields, "AtoiBase(current.Payload.Value, current.Payload.Base)", `0`,
+			[]practiceCase{
+				valueBaseIntCase("Binary", "1010", "01", 10),
+				valueBaseIntCase("Hex", "ff", "0123456789abcdef", 255),
+				valueBaseIntCase("Negative", "-101", "01", -5),
+				valueBaseIntCase("Zero", "0", "0123456789", 0),
+			}),
+		piscineSpec(1075, "String Chunks", "Piscine Quest 7", "StringChunks(value string, size int) []string",
+			"Divide a string into fixed-size chunks.", "A string and positive chunk size.", "Chunks in order; the final chunk may be shorter. Invalid sizes return nil.",
+			[]string{"append", "len"}, stringSizeFields, "StringChunks(current.Payload.Value, current.Payload.Size)", `nil`,
+			[]practiceCase{
+				stringChunksCase("Exact", "abcdef", 2, []string{"ab", "cd", "ef"}),
+				stringChunksCase("Remainder", "abcde", 2, []string{"ab", "cd", "e"}),
+				stringChunksCase("Large", "go", 5, []string{"go"}),
+				stringChunksNilCase("Invalid", "go", 0),
+			}),
 	}
 }
 
