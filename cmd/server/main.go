@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
+	"fmt"
 	"io"
 	"io/fs"
 	"log"
@@ -27,9 +28,10 @@ import (
 )
 
 const maxRequestBytes = runner.MaxSourceBytes + 32*1024
+const defaultRunnerMode = "docker"
 
 type api struct {
-	runner   *runner.Runner
+	runner   runner.Service
 	receipts *receipts.Manager
 }
 
@@ -50,9 +52,14 @@ type validateRequest struct {
 func main() {
 	address := flag.String("addr", "127.0.0.1:8080", "local address to listen on")
 	openBrowser := flag.Bool("open", false, "open the assessment in the default browser")
+	runnerMode := flag.String("runner", defaultRunnerMode, "execution runner: docker or local")
 	flag.Parse()
 
 	if err := assessment.Validate(); err != nil {
+		log.Fatal(err)
+	}
+	mode, err := parseRunnerMode(*runnerMode)
+	if err != nil {
 		log.Fatal(err)
 	}
 	dataDir, err := localDataDir()
@@ -63,8 +70,24 @@ func main() {
 	if err != nil {
 		log.Fatalf("initialize pass receipts: %v", err)
 	}
+	var executionRunner runner.Service
+	switch mode {
+	case runner.ModeDocker:
+		log.Printf("Preparing the Docker sandbox (the first launch may build its pinned image)...")
+		startupCtx, cancelStartup := context.WithTimeout(context.Background(), 10*time.Minute)
+		executionRunner, err = runner.NewDocker(startupCtx, runner.DockerOptions{
+			MaxConcurrent: 2,
+			Receipts:      receiptManager,
+		})
+		cancelStartup()
+		if err != nil {
+			log.Fatalf("Docker sandbox is unavailable: %v", err)
+		}
+	case runner.ModeLocal:
+		executionRunner = runner.NewLocal("go", 2, receiptManager)
+	}
 	handler, err := routes(&api{
-		runner:   runner.New("go", 2, receiptManager),
+		runner:   executionRunner,
 		receipts: receiptManager,
 	})
 	if err != nil {
@@ -85,7 +108,11 @@ func main() {
 	}
 	url := "http://" + listener.Addr().String()
 	log.Printf("Imperative Go Practice Assessment is ready at %s", url)
-	log.Printf("Trusted local practice only: the Go runner is not hardened for public deployment.")
+	if mode == runner.ModeDocker {
+		log.Printf("Execution mode: Docker sandbox (fresh restricted container per run).")
+	} else {
+		log.Printf("Execution mode: LOCAL RUNNER — trusted code only. Submitted code runs with your user permissions.")
+	}
 	if *openBrowser {
 		go func() {
 			time.Sleep(250 * time.Millisecond)
@@ -109,7 +136,18 @@ func main() {
 func routes(api *api) (http.Handler, error) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", func(writer http.ResponseWriter, _ *http.Request) {
-		writeJSON(writer, http.StatusOK, map[string]any{"ok": true, "goVersion": strings.TrimSpace(goVersion())})
+		info := api.runner.Info()
+		health := map[string]any{
+			"ok":           true,
+			"runnerMode":   info.Mode,
+			"sandboxReady": info.SandboxReady,
+			"goVersion":    info.GoVersion,
+			"message":      info.Message,
+		}
+		if info.DockerImage != "" {
+			health["dockerImage"] = info.DockerImage
+		}
+		writeJSON(writer, http.StatusOK, health)
 	})
 	mux.HandleFunc("GET /api/levels", func(writer http.ResponseWriter, _ *http.Request) {
 		writeJSON(writer, http.StatusOK, map[string]any{"levels": assessment.PublicLevels(), "schemaVersion": 1})
@@ -227,14 +265,6 @@ func localDataDir() (string, error) {
 	return filepath.Join(config, "imperative-go-assessment"), nil
 }
 
-func goVersion() string {
-	output, err := exec.Command("go", "version").Output()
-	if err != nil {
-		return "Go executable unavailable"
-	}
-	return string(output)
-}
-
 func launchBrowser(url string) error {
 	var command *exec.Cmd
 	switch {
@@ -251,4 +281,15 @@ func launchBrowser(url string) error {
 func init() {
 	log.SetFlags(0)
 	log.SetPrefix("assessment: ")
+}
+
+func parseRunnerMode(value string) (runner.Mode, error) {
+	switch runner.Mode(strings.ToLower(strings.TrimSpace(value))) {
+	case runner.ModeDocker:
+		return runner.ModeDocker, nil
+	case runner.ModeLocal:
+		return runner.ModeLocal, nil
+	default:
+		return "", fmt.Errorf("invalid -runner value %q; use docker or local", value)
+	}
 }
