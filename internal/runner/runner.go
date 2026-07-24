@@ -1,21 +1,14 @@
 package runner
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
+	"go/format"
 	"regexp"
-	"runtime"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/pleft/imperative-assessment-golang/internal/assessment"
@@ -24,6 +17,24 @@ import (
 const (
 	MaxSourceBytes = 192 * 1024
 	MaxOutputBytes = 256 * 1024
+
+	CompileTimeout = 20 * time.Second
+	RuntimeTimeout = 4 * time.Second
+)
+
+type Mode string
+
+const (
+	ModeDocker Mode = "docker"
+	ModeLocal  Mode = "local"
+)
+
+const (
+	FailureCapacity = "capacity"
+	FailureCleanup  = "cleanup"
+	FailureInternal = "internal"
+	FailureOutput   = "output"
+	FailureStartup  = "startup"
 )
 
 var packagePattern = regexp.MustCompile(`(?m)^\s*package\s+main\s*(?:\r?\n)?`)
@@ -48,6 +59,7 @@ type RunResult struct {
 	TotalCount    int          `json:"totalCount"`
 	CompileError  string       `json:"compileError,omitempty"`
 	RuntimeError  string       `json:"runtimeError,omitempty"`
+	FailureKind   string       `json:"failureKind,omitempty"`
 	TimedOut      bool         `json:"timedOut"`
 	Stopped       bool         `json:"stopped"`
 	Stdout        string       `json:"stdout"`
@@ -59,24 +71,64 @@ type RunResult struct {
 	Receipt       string       `json:"receipt,omitempty"`
 }
 
+type Info struct {
+	Mode         Mode   `json:"runnerMode"`
+	SandboxReady bool   `json:"sandboxReady"`
+	GoVersion    string `json:"goVersion"`
+	DockerImage  string `json:"dockerImage,omitempty"`
+	Message      string `json:"message"`
+}
+
+type Service interface {
+	Run(context.Context, assessment.Level, string, []string) RunResult
+	Format(context.Context, string) (string, error)
+	Info() Info
+}
+
 type ReceiptIssuer interface {
 	Issue(levelID int, sourceHash string) (string, error)
 }
 
-type Runner struct {
-	goBinary string
+type common struct {
 	slots    chan struct{}
 	receipts ReceiptIssuer
 }
 
-func New(goBinary string, maxConcurrent int, receipts ReceiptIssuer) *Runner {
-	if goBinary == "" {
-		goBinary = "go"
-	}
+func newCommon(maxConcurrent int, receipts ReceiptIssuer) common {
 	if maxConcurrent < 1 {
 		maxConcurrent = 1
 	}
-	return &Runner{goBinary: goBinary, slots: make(chan struct{}, maxConcurrent), receipts: receipts}
+	return common{
+		slots:    make(chan struct{}, maxConcurrent),
+		receipts: receipts,
+	}
+}
+
+func (shared *common) acquire(ctx context.Context, result *RunResult, started time.Time) bool {
+	select {
+	case shared.slots <- struct{}{}:
+		return true
+	case <-ctx.Done():
+		result.Stopped = true
+		result.DurationMS = elapsedMS(started)
+		return false
+	default:
+		result.FailureKind = FailureCapacity
+		result.RuntimeError = "The runner is temporarily at capacity. Wait for the current run to finish, then try again."
+		result.DurationMS = elapsedMS(started)
+		return false
+	}
+}
+
+func (shared *common) release() {
+	<-shared.slots
+}
+
+func (shared *common) issueReceipt(level assessment.Level, testIDs []string, result *RunResult) {
+	result.Passed = len(testIDs) == 0 && result.PassedCount == len(level.Tests)
+	if result.Passed && shared.receipts != nil {
+		result.Receipt, _ = shared.receipts.Issue(level.ID, result.SourceHash)
+	}
 }
 
 func PrepareSource(source string) string {
@@ -85,36 +137,35 @@ func PrepareSource(source string) string {
 	return "package main\n\n" + strings.TrimSpace(source) + "\n"
 }
 
-func (runner *Runner) Format(ctx context.Context, source string) (string, error) {
+func FormatSource(source string) (string, error) {
 	if len(source) > MaxSourceBytes {
 		return "", fmt.Errorf("source exceeds %d bytes", MaxSourceBytes)
 	}
-	command := exec.CommandContext(ctx, "gofmt")
-	command.Stdin = strings.NewReader(PrepareSource(source))
-	var output bytes.Buffer
-	var stderr bytes.Buffer
-	command.Stdout = &output
-	command.Stderr = &stderr
-	if err := command.Run(); err != nil {
-		return "", fmt.Errorf("%s", strings.TrimSpace(stderr.String()))
+	formatted, err := format.Source([]byte(PrepareSource(source)))
+	if err != nil {
+		return "", fmt.Errorf("%s", cleanCompilerError(err.Error()))
 	}
-	formatted := packagePattern.ReplaceAllString(output.String(), "")
-	return strings.TrimSpace(formatted) + "\n", nil
+	withoutPackage := packagePattern.ReplaceAllString(string(formatted), "")
+	return strings.TrimSpace(withoutPackage) + "\n", nil
 }
 
-func (runner *Runner) Run(ctx context.Context, level assessment.Level, source string, testIDs []string) RunResult {
-	started := time.Now()
+func sourceHash(prepared string) string {
+	sum := sha256.Sum256([]byte(prepared))
+	return hex.EncodeToString(sum[:])
+}
+
+func prepareRun(level assessment.Level, source string, testIDs []string, started time.Time) (RunResult, []assessment.VisibleTest, string, bool) {
 	result := RunResult{LevelID: level.ID}
 	if len(source) > MaxSourceBytes {
 		result.CompileError = fmt.Sprintf("Source is too large. The limit is %d KiB.", MaxSourceBytes/1024)
 		result.DurationMS = elapsedMS(started)
-		return result
+		return result, nil, "", false
 	}
 	selected, valid := assessment.SelectTests(level, testIDs)
 	if !valid {
 		result.CompileError = "The request contains an unknown test identifier."
 		result.DurationMS = elapsedMS(started)
-		return result
+		return result, nil, "", false
 	}
 	result.TotalCount = len(selected)
 	for _, current := range selected {
@@ -124,72 +175,13 @@ func (runner *Runner) Run(ctx context.Context, level assessment.Level, source st
 		})
 	}
 	prepared := PrepareSource(source)
-	sum := sha256.Sum256([]byte(prepared))
-	result.SourceHash = hex.EncodeToString(sum[:])
+	result.SourceHash = sourceHash(prepared)
+	return result, selected, prepared, true
+}
 
-	select {
-	case runner.slots <- struct{}{}:
-		defer func() { <-runner.slots }()
-	case <-ctx.Done():
-		result.Stopped = true
-		result.DurationMS = elapsedMS(started)
-		return result
-	}
-
-	tempDir, err := os.MkdirTemp("", "imperative-assessment-*")
-	if err != nil {
-		result.RuntimeError = "Could not create an isolated temporary run directory."
-		result.DurationMS = elapsedMS(started)
-		return result
-	}
-	defer os.RemoveAll(tempDir)
-
-	solutionPath := filepath.Join(tempDir, "solution.go")
-	harnessPath := filepath.Join(tempDir, "assessment_harness.go")
-	executablePath := filepath.Join(tempDir, "assessment-runner")
-	if runtime.GOOS == "windows" {
-		executablePath += ".exe"
-	}
-	if err := os.WriteFile(solutionPath, []byte(prepared), 0o600); err != nil {
-		result.RuntimeError = "Could not prepare the submitted source."
-		result.DurationMS = elapsedMS(started)
-		return result
-	}
-	if err := os.WriteFile(harnessPath, []byte(level.BuildHarness(selected)), 0o600); err != nil {
-		result.RuntimeError = "Could not prepare the controlled test harness."
-		result.DurationMS = elapsedMS(started)
-		return result
-	}
-
-	buildCtx, cancelBuild := context.WithTimeout(ctx, 20*time.Second)
-	buildStdout, buildStderr, buildErr, buildLimited := runCommand(buildCtx, MaxOutputBytes, runner.goBinary, "build", "-trimpath", "-o", executablePath, solutionPath, harnessPath)
-	cancelBuild()
-	result.Stdout = buildStdout
-	result.Stderr = buildStderr
-	if buildErr != nil {
-		if errors.Is(buildCtx.Err(), context.DeadlineExceeded) {
-			result.TimedOut = true
-			result.CompileError = "Compilation exceeded the 20 second limit."
-		} else if errors.Is(ctx.Err(), context.Canceled) {
-			result.Stopped = true
-		} else if buildLimited {
-			result.CompileError = "Compiler output exceeded the 256 KiB limit."
-		} else {
-			result.CompileError = cleanCompilerError(buildStderr)
-		}
-		markAll(result.Results, "compile", result.CompileError)
-		result.DurationMS = elapsedMS(started)
-		return result
-	}
-
-	runCtx, cancelRun := context.WithTimeout(ctx, 4*time.Second)
-	runStdout, runStderr, runErr, runLimited := runCommand(runCtx, MaxOutputBytes, executablePath)
-	cancelRun()
-	result.Stdout = stripMarkers(runStdout)
-	result.Stderr = runStderr
-	wireResults := parseResults(runStdout)
-	byID := make(map[string]wireResult, len(wireResults))
-	for _, item := range wireResults {
+func applyWireResults(result *RunResult, items []wireResult) {
+	byID := make(map[string]wireResult, len(items))
+	for _, item := range items {
 		byID[item.ID] = item
 	}
 	for index := range result.Results {
@@ -214,32 +206,6 @@ func (runner *Runner) Run(ctx context.Context, level assessment.Level, source st
 			result.Results[index].Status = "assertion"
 		}
 	}
-	if runErr != nil {
-		switch {
-		case errors.Is(runCtx.Err(), context.DeadlineExceeded):
-			result.TimedOut = true
-			result.RuntimeError = "Execution exceeded the 4 second limit and was terminated."
-		case errors.Is(ctx.Err(), context.Canceled):
-			result.Stopped = true
-			result.RuntimeError = "Execution was stopped."
-		case runLimited:
-			result.RuntimeError = "Program output exceeded the 256 KiB limit and execution was terminated."
-		default:
-			result.RuntimeError = strings.TrimSpace(runStderr)
-			if result.RuntimeError == "" {
-				result.RuntimeError = "The program exited before completing every test."
-			}
-		}
-	}
-	result.Passed = len(testIDs) == 0 && result.PassedCount == len(level.Tests)
-	if result.Passed && runner.receipts != nil {
-		result.Receipt, _ = runner.receipts.Issue(level.ID, result.SourceHash)
-	}
-	formatCtx, cancelFormat := context.WithTimeout(context.Background(), 3*time.Second)
-	result.FormattedCode, _ = runner.Format(formatCtx, source)
-	cancelFormat()
-	result.DurationMS = elapsedMS(started)
-	return result
 }
 
 type wireResult struct {
@@ -247,31 +213,6 @@ type wireResult struct {
 	Actual     string  `json:"actual"`
 	Failure    string  `json:"failure"`
 	DurationMS float64 `json:"durationMs"`
-}
-
-func parseResults(stdout string) []wireResult {
-	var results []wireResult
-	for _, line := range strings.Split(strings.ReplaceAll(stdout, "\r\n", "\n"), "\n") {
-		if !strings.HasPrefix(line, "__IMPERATIVE_ASSESSMENT_RESULT__") {
-			continue
-		}
-		var result wireResult
-		if json.Unmarshal([]byte(strings.TrimPrefix(line, "__IMPERATIVE_ASSESSMENT_RESULT__")), &result) == nil {
-			results = append(results, result)
-		}
-	}
-	return results
-}
-
-func stripMarkers(stdout string) string {
-	lines := strings.Split(strings.ReplaceAll(stdout, "\r\n", "\n"), "\n")
-	kept := lines[:0]
-	for _, line := range lines {
-		if !strings.HasPrefix(line, "__IMPERATIVE_ASSESSMENT_RESULT__") {
-			kept = append(kept, line)
-		}
-	}
-	return strings.TrimSpace(strings.Join(kept, "\n"))
 }
 
 func markAll(results []TestResult, status, failure string) {
@@ -296,49 +237,6 @@ func cleanCompilerError(message string) string {
 
 func elapsedMS(started time.Time) float64 {
 	return float64(time.Since(started).Microseconds()) / 1000
-}
-
-type limitedBuffer struct {
-	mu      sync.Mutex
-	buffer  bytes.Buffer
-	limit   int
-	limited bool
-	cancel  context.CancelFunc
-}
-
-func (buffer *limitedBuffer) Write(data []byte) (int, error) {
-	buffer.mu.Lock()
-	defer buffer.mu.Unlock()
-	remaining := buffer.limit - buffer.buffer.Len()
-	if remaining > 0 {
-		if len(data) < remaining {
-			remaining = len(data)
-		}
-		_, _ = buffer.buffer.Write(data[:remaining])
-	}
-	if len(data) > remaining && !buffer.limited {
-		buffer.limited = true
-		buffer.cancel()
-	}
-	return len(data), nil
-}
-
-func (buffer *limitedBuffer) String() string {
-	buffer.mu.Lock()
-	defer buffer.mu.Unlock()
-	return buffer.buffer.String()
-}
-
-func runCommand(parent context.Context, limit int, name string, args ...string) (string, string, error, bool) {
-	ctx, cancel := context.WithCancel(parent)
-	defer cancel()
-	stdout := &limitedBuffer{limit: limit, cancel: cancel}
-	stderr := &limitedBuffer{limit: limit, cancel: cancel}
-	command := exec.CommandContext(ctx, name, args...)
-	command.Stdout = stdout
-	command.Stderr = stderr
-	err := command.Run()
-	return stdout.String(), stderr.String(), err, stdout.limited || stderr.limited
 }
 
 func SortedStatuses(results []TestResult) []string {
