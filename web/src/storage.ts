@@ -6,7 +6,7 @@ import type {
   TimerState,
 } from "./types";
 
-export const STORAGE_KEY = "imperative-go-assessment:progress:v1";
+export const STORAGE_KEY = "imperative-go-assessment:progress:v2";
 export const ASSESSMENT_SECONDS = 6 * 60 * 60;
 
 export const defaultSettings = (): Settings => ({
@@ -45,7 +45,7 @@ export function makeLevelProgress(level: Level): LevelProgress {
 
 export function createProgress(levels: Level[]): SavedProgress {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     updatedAt: Date.now(),
     currentLevelId: 1,
     levels: Object.fromEntries(
@@ -61,8 +61,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export function validateImport(value: unknown, levels: Level[]): SavedProgress {
-  if (!isRecord(value) || value.schemaVersion !== 1) {
-    throw new Error("This backup does not use progress schema version 1.");
+  if (!isRecord(value) || value.schemaVersion !== 2) {
+    throw new Error("This backup does not use progress schema version 2.");
   }
   if (
     typeof value.currentLevelId !== "number" ||
@@ -183,7 +183,7 @@ export function settleTimer(timer: TimerState, now = Date.now()): TimerState {
 
 export function sequentialCompleted(progress: SavedProgress): number {
   let completed = 0;
-  for (let levelId = 1; levelId <= 9; levelId += 1) {
+  for (let levelId = 1; levelId <= Object.keys(progress.levels).length; levelId += 1) {
     if (!progress.levels[String(levelId)]?.passed) break;
     completed = levelId;
   }
