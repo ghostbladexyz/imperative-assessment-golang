@@ -15,7 +15,7 @@ func (testIssuer) Issue(levelID int, sourceHash string) (string, error) {
 }
 
 func TestRunnerAcceptsCorrectAndRejectsIncorrectCode(t *testing.T) {
-	level, _ := assessment.FindLevel(1)
+	level, _ := assessment.FindLevel(22)
 	localRunner := New("go", 1, testIssuer{})
 	correct := `func NormalizeTokens(input string) []string {
 	result := make([]string, 0)
@@ -52,7 +52,7 @@ func TestRunnerAcceptsCorrectAndRejectsIncorrectCode(t *testing.T) {
 }
 
 func TestRunnerReportsCompilerErrors(t *testing.T) {
-	level, _ := assessment.FindLevel(1)
+	level, _ := assessment.FindLevel(22)
 	result := New("go", 1, nil).Run(
 		context.Background(),
 		level,
@@ -65,7 +65,7 @@ func TestRunnerReportsCompilerErrors(t *testing.T) {
 }
 
 func TestRunnerExplainsGoDebugOutputAfterConsoleLogError(t *testing.T) {
-	level, _ := assessment.FindLevel(1)
+	level, _ := assessment.FindLevel(22)
 	result := New("go", 1, nil).Run(
 		context.Background(),
 		level,
@@ -82,7 +82,7 @@ func TestRunnerExplainsGoDebugOutputAfterConsoleLogError(t *testing.T) {
 }
 
 func TestRunnerCapturesStudentStandardOutput(t *testing.T) {
-	level, _ := assessment.FindLevel(1)
+	level, _ := assessment.FindLevel(22)
 	result := New("go", 1, nil).Run(
 		context.Background(),
 		level,
@@ -99,7 +99,7 @@ func TestRunnerCapturesStudentStandardOutput(t *testing.T) {
 }
 
 func TestRunnerTerminatesTimeout(t *testing.T) {
-	level, _ := assessment.FindLevel(1)
+	level, _ := assessment.FindLevel(22)
 	result := New("go", 1, nil).Run(
 		context.Background(),
 		level,
