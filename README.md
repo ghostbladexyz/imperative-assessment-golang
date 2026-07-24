@@ -1,7 +1,7 @@
 # Imperative Go Practice Assessment
 
-A local, browser-based practice assessment with nine Go exercises, visible tests,
-progress tracking, and a six-hour timer. Submitted code runs in a restricted
+A local, browser-based practice assessment with 30 Go exercises, automatic
+tests, console feedback, and saved progress. Submitted code runs in a restricted
 Docker container by default.
 
 The exercises are original practice material, not copied from an official
@@ -46,7 +46,7 @@ make run-local
 ```
 
 The local runner executes submissions with your operating-system permissions.
-It keeps the same time and output limits but is not a sandbox.
+It keeps the same execution and output limits but is not a sandbox.
 
 ## Development
 
