@@ -778,7 +778,14 @@ func levelNine() Level {
 		"Processor is supplied and the handler factory starts unfinished.",
 	)
 	instructions.Constraints = []string{"At most workers processor calls at once.", "Reject workers <= 0 without processing.", "Limit values to 100 items; each value must be non-blank after trimming.", "Preserve result order.", "Cancel processing on error and wait for workers.", "Reject unknown fields and trailing JSON."}
-	instructions.Examples = []Example{{Input: `POST /batch {"values":["go","lang"]}, uppercase processor`, Output: `200 {"results":["GO","LANG"]}`}, {Input: `processor fails`, Output: `422 JSON error`}}
+	instructions.Examples = []Example{
+		{Input: `POST /batch {"values":["go","lang"]}, workers 2, uppercase processor`, Output: `200 {"results":["GO","LANG"]}`},
+		{Input: `POST /batch {"values":[]}, workers 2`, Output: `200 {"results":[]}`},
+		{Input: `POST /batch {"values":["ok","  "]}`, Output: `400 JSON error; processor is never called`},
+		{Input: `GET /batch`, Output: `405 JSON error with Allow: POST`},
+		{Input: `processor fails for one value`, Output: `422 JSON error after workers stop`},
+	}
+	setSourcePolicy(&instructions, []string{"append", "close", "len", "make"}, []string{"context", "encoding/json", "fmt", "io", "net/http", "strings", "sync"})
 	instructions.Documentation = []DocumentationLink{{Label: "HTTP handlers", URL: "https://pkg.go.dev/net/http#Handler"}, {Label: "JSON Decoder", URL: "https://pkg.go.dev/encoding/json#Decoder"}, {Label: "Context cancellation", URL: "https://go.dev/blog/context"}}
 	instructions.Hints = []string{"Validate the entire request before starting goroutines.", "Use indexed jobs and a fixed worker pool, as in level 7.", "Create a child context from r.Context and cancel it on the first processor error."}
 	instructions.CommonPitfalls = []string{"Writing results in completion order", "Leaking workers after an error", "Starting work before all values are validated"}
