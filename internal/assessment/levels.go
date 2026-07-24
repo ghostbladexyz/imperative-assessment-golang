@@ -28,7 +28,8 @@ func test(id, name, purpose, input, expected string, payload any) VisibleTest {
 }
 
 func Levels() []Level {
-	return []Level{
+	levels := foundationalLevels()
+	levels = append(levels,
 		levelOne(),
 		levelTwo(),
 		levelThree(),
@@ -38,7 +39,11 @@ func Levels() []Level {
 		levelSeven(),
 		levelEight(),
 		levelNine(),
+	)
+	for index := range levels {
+		levels[index].StarterCode = "package main\n\n" + levels[index].StarterCode
 	}
+	return levels
 }
 
 func levelOne() Level {
@@ -60,7 +65,13 @@ func levelOne() Level {
 	instructions.Documentation = []DocumentationLink{{Label: "strings package", URL: "https://pkg.go.dev/strings"}, {Label: "Unicode rune basics", URL: "https://go.dev/blog/strings"}}
 	instructions.Disallowed = append(instructions.Disallowed, "regexp")
 	instructions.Hints = []string{"Build the current token one rune at a time.", "Flush a token whenever a rune is not ASCII alphanumeric.", "A small helper can lowercase A-Z by arithmetic, or strings.ToLower can normalize a completed token."}
-	instructions.CommonPitfalls = []string{"Returning nil for empty input", "Treating underscore as a token character", "Dropping repeated tokens"}
+	instructions.CommonPitfalls = []string{
+		"Go slices need a type: use []string{}, not [].",
+		"append is a built-in: use result = append(result, value), not result.append(value).",
+		"input[i] is a byte; use string(input[i]) when a string is required.",
+		"Treating underscore as a token character",
+		"Dropping repeated tokens",
+	}
 	tests := []VisibleTest{
 		test("l1-empty", "Empty input", "Returns a non-nil empty result.", `""`, `[]`, map[string]any{"input": ""}),
 		test("l1-word", "Single word", "Keeps a plain lowercase word.", `"gopher"`, `["gopher"]`, map[string]any{"input": "gopher"}),
@@ -75,9 +86,10 @@ func levelOne() Level {
 		test("l1-edges", "Edge punctuation", "Ignores leading and trailing separators.", `".first:last."`, `["first","last"]`, map[string]any{"input": ".first:last."}),
 		test("l1-mixed", "Mixed structured text", "Combines all normalization rules.", `"ID=AB-12; id=xy_9"`, `["id","ab","12","id","xy","9"]`, map[string]any{"input": "ID=AB-12; id=xy_9"}),
 	}
-	return Level{ID: 1, Title: "Token Trail", Topic: "Strings · loops · parsing", Difficulty: "Foundation", Signature: "NormalizeTokens(input string) []string", StarterCode: `func NormalizeTokens(input string) []string {
+	return Level{ID: 22, Title: "Token Trail", Topic: "Strings · loops · parsing", Difficulty: "Intermediate+", Signature: "NormalizeTokens(input string) []string", StarterCode: `func NormalizeTokens(input string) []string {
+	result := []string{}
 	// TODO: return lowercase ASCII letter/digit tokens.
-	return nil
+	return result
 }
 `, Instructions: instructions, Tests: tests, build: buildLevelOne}
 }
@@ -133,7 +145,7 @@ func levelTwo() Level {
 		test("l2-late-repeat", "Late repeat", "Updates without moving an item.", `["a","b","c","a"]`, `[{"word":"a","count":2},{"word":"b","count":1},{"word":"c","count":1}]`, map[string]any{"values": []string{"a", "b", "c", "a"}}),
 		test("l2-many", "Several groups", "Handles a denser stable tally.", `["x"," y ","z","x","y","x"]`, `[{"word":"x","count":3},{"word":"y","count":2},{"word":"z","count":1}]`, map[string]any{"values": []string{"x", " y ", "z", "x", "y", "x"}}),
 	}
-	return Level{ID: 2, Title: "First Seen Ledger", Topic: "Slices · maps · stable output", Difficulty: "Foundation+", Signature: "TallyWords(values []string) []WordCount", StarterCode: `import "strings"
+	return Level{ID: 23, Title: "First Seen Ledger", Topic: "Slices · maps · stable output", Difficulty: "Intermediate+", Signature: "TallyWords(values []string) []WordCount", StarterCode: `import "strings"
 
 type WordCount struct {
 	Word  string ` + "`json:\"word\"`" + `
@@ -202,7 +214,7 @@ func levelThree() Level {
 		test("l3-text", "Alphabetic text", "Rejects non-numeric input.", `"http"`, `error:ErrInvalidPort`, map[string]any{"input": "http"}),
 		test("l3-overflow", "Integer overflow", "Returns the sentinel rather than leaking strconv errors.", `"999999999999999999999999"`, `error:ErrInvalidPort`, map[string]any{"input": "999999999999999999999999"}),
 	}
-	return Level{ID: 3, Title: "Safe Harbor", Topic: "Validation · strconv · errors", Difficulty: "Intermediate", Signature: "ParsePort(input string) (int, error)", StarterCode: `import (
+	return Level{ID: 24, Title: "Safe Harbor", Topic: "Validation · strconv · errors", Difficulty: "Advanced-", Signature: "ParsePort(input string) (int, error)", StarterCode: `import (
 	"errors"
 	"strconv"
 	"strings"
@@ -276,7 +288,7 @@ func levelFour() Level {
 		test("l4-bad-price", "Malformed price", "Rejects a decimal price.", `"pen,2,1.5"`, `error`, map[string]any{"text": "pen,2,1.5"}),
 		test("l4-mixed-error", "Error after valid row", "Does not silently ignore later damage.", `"pen,1,5\nbroken\ntea,1,5"`, `error`, map[string]any{"text": "pen,1,5\nbroken\ntea,1,5"}),
 	}
-	return Level{ID: 4, Title: "Stockroom Stream", Topic: "Scanner · structs · aggregation", Difficulty: "Intermediate", Signature: "SummarizeInventory(r io.Reader) ([]ItemTotal, error)", StarterCode: `import (
+	return Level{ID: 25, Title: "Stockroom Stream", Topic: "Scanner · structs · aggregation", Difficulty: "Advanced-", Signature: "SummarizeInventory(r io.Reader) ([]ItemTotal, error)", StarterCode: `import (
 	"bufio"
 	"fmt"
 	"io"
@@ -342,7 +354,7 @@ func levelFive() Level {
 	instructions.Hints = []string{"Check the path, then method, before decoding.", "Use json.Decoder.DisallowUnknownFields.", "Decode once into the request, then ensure a second decode returns io.EOF."}
 	instructions.CommonPitfalls = []string{"Writing status before headers", "Accepting whitespace-only names", "Returning plain-text errors"}
 	tests := makeHTTPTests()
-	return Level{ID: 5, Title: "Hello, Handler", Topic: "HTTP · JSON · validation", Difficulty: "Intermediate+", Signature: "NewGreetingHandler() http.Handler", StarterCode: `import (
+	return Level{ID: 26, Title: "Hello, Handler", Topic: "HTTP · JSON · validation", Difficulty: "Advanced", Signature: "NewGreetingHandler() http.Handler", StarterCode: `import (
 	"encoding/json"
 	"io"
 	"net/http"
@@ -437,7 +449,7 @@ func levelSix() Level {
 	instructions.Hints = []string{"Copy and sort the input, then use a left and right pointer.", "When you find a pair, skip every duplicate of both values.", "A pair using the same value requires at least two occurrences, which two pointers naturally enforce."}
 	instructions.CommonPitfalls = []string{"Returning duplicate pairs", "Mutating values while sorting", "Returning pairs in discovery order"}
 	tests := makePairTests()
-	return Level{ID: 6, Title: "Balanced Pairs", Topic: "Algorithms · sorting · two pointers", Difficulty: "Advanced", Signature: "PairSums(values []int, target int) [][2]int", StarterCode: `func PairSums(values []int, target int) [][2]int {
+	return Level{ID: 27, Title: "Balanced Pairs", Topic: "Algorithms · sorting · two pointers", Difficulty: "Advanced", Signature: "PairSums(values []int, target int) [][2]int", StarterCode: `func PairSums(values []int, target int) [][2]int {
 	// TODO: return unique, sorted value pairs without changing values.
 	return nil
 }
@@ -518,7 +530,7 @@ func levelSeven() Level {
 	instructions.Hints = []string{"Create a child context you can cancel on the first error.", "Send indexed jobs through a channel to a fixed number of workers.", "Close jobs, wait for every worker, then prefer the first worker error over context cancellation."}
 	instructions.CommonPitfalls = []string{"Appending results in completion order", "Returning before workers stop", "Losing the original error behind context.Canceled"}
 	tests := makeConcurrencyTests()
-	return Level{ID: 7, Title: "Ordered Workshop", Topic: "Goroutines · channels · cancellation", Difficulty: "Advanced", Signature: "MapOrdered(ctx context.Context, inputs []int, workers int, fn func(context.Context, int) (int, error)) ([]int, error)", StarterCode: `import (
+	return Level{ID: 28, Title: "Ordered Workshop", Topic: "Goroutines · channels · cancellation", Difficulty: "Advanced+", Signature: "MapOrdered(ctx context.Context, inputs []int, workers int, fn func(context.Context, int) (int, error)) ([]int, error)", StarterCode: `import (
 	"context"
 	"errors"
 )
@@ -643,7 +655,7 @@ func levelEight() Level {
 	instructions.Hints = []string{"Call QueryContext with the constant query and minCents as a separate argument.", "Loop while rows.Next and scan into a fresh AccountTotal.", "Close with defer, then check rows.Err after the loop."}
 	instructions.CommonPitfalls = []string{"Formatting minCents into SQL", "Forgetting Close", "Ignoring Scan or Rows.Err errors"}
 	tests := makeSQLTests()
-	return Level{ID: 8, Title: "Account Rollup", Topic: "SQL boundary · scanning · errors", Difficulty: "Stretch", Stretch: true, Signature: "LoadAccountTotals(ctx context.Context, db Queryer, minCents int64) ([]AccountTotal, error)", StarterCode: `import "context"
+	return Level{ID: 29, Title: "Account Rollup", Topic: "SQL boundary · scanning · errors", Difficulty: "Stretch", Stretch: true, Signature: "LoadAccountTotals(ctx context.Context, db Queryer, minCents int64) ([]AccountTotal, error)", StarterCode: `import "context"
 
 type RowSet interface {
 	Next() bool
@@ -790,7 +802,7 @@ func levelNine() Level {
 	instructions.Hints = []string{"Validate the entire request before starting goroutines.", "Use indexed jobs and a fixed worker pool, as in level 7.", "Create a child context from r.Context and cancel it on the first processor error."}
 	instructions.CommonPitfalls = []string{"Writing results in completion order", "Leaking workers after an error", "Starting work before all values are validated"}
 	tests := makeIntegratedTests()
-	return Level{ID: 9, Title: "Batch Gateway", Topic: "HTTP · parsing · concurrency", Difficulty: "Stretch+", Stretch: true, Signature: "NewBatchHandler(processor Processor, workers int) http.Handler", StarterCode: `import (
+	return Level{ID: 30, Title: "Batch Gateway", Topic: "HTTP · parsing · concurrency", Difficulty: "Stretch+", Stretch: true, Signature: "NewBatchHandler(processor Processor, workers int) http.Handler", StarterCode: `import (
 	"context"
 	"encoding/json"
 	"net/http"
@@ -884,11 +896,11 @@ type responseView struct {
 
 func Validate() error {
 	levels := Levels()
-	if len(levels) != 9 {
-		return fmt.Errorf("expected 9 levels, got %d", len(levels))
+	if len(levels) != 30 {
+		return fmt.Errorf("expected 30 levels, got %d", len(levels))
 	}
 	for index, level := range levels {
-		if level.ID != index+1 || len(level.Tests) < 10 || len(level.Tests) > 18 {
+		if level.ID != index+1 || len(level.Tests) < 5 || len(level.Tests) > 18 {
 			return fmt.Errorf("invalid level %d definition", level.ID)
 		}
 		seen := map[string]bool{}
