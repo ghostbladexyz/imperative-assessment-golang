@@ -1,4 +1,4 @@
-import type { Level, RunResult } from "./types";
+import type { Level, RunnerConfig, RunResult } from "./types";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -18,6 +18,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export async function fetchLevels(): Promise<Level[]> {
   const response = await request<{ levels: Level[] }>("/api/levels");
   return response.levels;
+}
+
+export async function fetchRunnerConfig(): Promise<RunnerConfig> {
+  return request<RunnerConfig>("/api/health");
 }
 
 export async function runTests(
@@ -53,4 +57,3 @@ export async function validateReceipts(
   );
   return response.validLevelIds;
 }
-
