@@ -227,11 +227,12 @@ func runCommand(parent context.Context, directory string, limit int, name string
 func parseResults(stdout string) []sandboxprotocol.TestResult {
 	results := make([]sandboxprotocol.TestResult, 0)
 	for _, line := range strings.Split(strings.ReplaceAll(stdout, "\r\n", "\n"), "\n") {
-		if !strings.HasPrefix(line, resultMarker) {
+		_, payload, found := splitResultLine(line)
+		if !found {
 			continue
 		}
 		var result sandboxprotocol.TestResult
-		if json.Unmarshal([]byte(strings.TrimPrefix(line, resultMarker)), &result) == nil {
+		if json.Unmarshal([]byte(payload), &result) == nil {
 			results = append(results, result)
 		}
 	}
@@ -242,11 +243,26 @@ func stripMarkers(stdout string) string {
 	lines := strings.Split(strings.ReplaceAll(stdout, "\r\n", "\n"), "\n")
 	kept := lines[:0]
 	for _, line := range lines {
-		if !strings.HasPrefix(line, resultMarker) {
+		prefix, _, found := splitResultLine(line)
+		if found {
+			kept = append(kept, prefix)
+		} else {
 			kept = append(kept, line)
 		}
 	}
 	return strings.TrimSpace(strings.Join(kept, "\n"))
+}
+
+func splitResultLine(line string) (string, string, bool) {
+	index := strings.Index(line, resultMarker)
+	if index < 0 {
+		return "", "", false
+	}
+	payload := line[index+len(resultMarker):]
+	if !json.Valid([]byte(payload)) {
+		return "", "", false
+	}
+	return line[:index], payload, true
 }
 
 func cleanCompilerError(message string) string {
