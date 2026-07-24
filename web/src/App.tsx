@@ -36,6 +36,7 @@ import {
   RotateCcw,
   Save,
   ShieldAlert,
+  ShieldCheck,
   Sparkles,
   Square,
   Sun,
@@ -45,6 +46,7 @@ import {
 } from "lucide-react";
 import {
   fetchLevels,
+  fetchRunnerConfig,
   formatCode,
   runTests,
   validateReceipts,
@@ -62,6 +64,7 @@ import {
 } from "./storage";
 import type {
   Level,
+  RunnerConfig,
   RunResult,
   SavedProgress,
   TestResult,
@@ -88,6 +91,9 @@ function formatSpent(seconds: number): string {
 }
 
 function outcomeFor(result: RunResult): string {
+  if (result.failureKind === "output") return "Output limit";
+  if (result.failureKind === "capacity") return "Runner at capacity";
+  if (result.failureKind === "cleanup") return "Cleanup error";
   if (result.timedOut) return "Timeout";
   if (result.stopped) return "Stopped";
   if (result.compileError) return "Compile error";
@@ -107,6 +113,7 @@ function download(name: string, contents: string, type: string): void {
 
 function App() {
   const [levels, setLevels] = useState<Level[]>([]);
+  const [runnerConfig, setRunnerConfig] = useState<RunnerConfig | null>(null);
   const [progress, setProgress] = useState<SavedProgress | null>(null);
   const [runs, setRuns] = useState<Record<string, RunResult>>({});
   const [loadingError, setLoadingError] = useState("");
@@ -139,8 +146,8 @@ function App() {
 
   useEffect(() => {
     let cancelled = false;
-    void fetchLevels()
-      .then(async (loadedLevels) => {
+    void Promise.all([fetchLevels(), fetchRunnerConfig()])
+      .then(async ([loadedLevels, loadedRunnerConfig]) => {
         if (cancelled) return;
         const loaded = loadProgress(loadedLevels);
         const receiptMap = Object.fromEntries(
@@ -157,6 +164,7 @@ function App() {
           for (const item of Object.values(loaded.levels)) item.passed = false;
         }
         setLevels(loadedLevels);
+        setRunnerConfig(loadedRunnerConfig);
         setProgress({ ...loaded, timer: settleTimer(loaded.timer) });
       })
       .catch((error: unknown) => {
@@ -356,6 +364,16 @@ function App() {
           toast("Compilation needs attention.", "bad");
         } else if (result.timedOut) {
           toast("The run timed out and was terminated.", "bad");
+        } else if (result.failureKind === "capacity") {
+          toast("The runner is busy. Wait for the current run, then retry.", "bad");
+        } else if (result.failureKind === "cleanup") {
+          toast("The sandbox container could not be cleaned up safely.", "bad");
+        } else if (result.failureKind === "output") {
+          toast("Program output exceeded the 256 KiB limit.", "bad");
+        } else if (result.failureKind === "startup") {
+          toast("The sandbox container could not start. Check Docker Desktop.", "bad");
+        } else if (result.runtimeError) {
+          toast(result.runtimeError, "bad");
         } else {
           toast(`${result.passedCount}/${result.totalCount} tests passed.`);
         }
@@ -558,7 +576,7 @@ function App() {
     );
   }
 
-  if (!progress || !currentLevel || !currentLevelProgress) {
+  if (!progress || !currentLevel || !currentLevelProgress || !runnerConfig) {
     return (
       <main className="loading-state" aria-live="polite">
         <div className="loading-mark">
@@ -594,6 +612,19 @@ function App() {
           <div>
             <p className="eyebrow">Local practice environment</p>
             <h1>Imperative Go Practice Assessment</h1>
+            <div
+              className={`mode-badge ${runnerConfig.runnerMode}`}
+              title={`${runnerConfig.message} Execution toolchain: ${runnerConfig.goVersion}`}
+            >
+              {runnerConfig.runnerMode === "docker" ? (
+                <ShieldCheck />
+              ) : (
+                <ShieldAlert />
+              )}
+              {runnerConfig.runnerMode === "docker"
+                ? "Docker sandbox"
+                : "Local runner — trusted code only"}
+            </div>
           </div>
         </div>
 
@@ -869,6 +900,7 @@ function App() {
                 level={currentLevel}
                 result={currentRun}
                 running={running}
+                runnerMode={runnerConfig.runnerMode}
                 expanded={expandedTests}
                 showAll={showAllDetails}
                 onToggle={(id) =>
@@ -971,11 +1003,14 @@ function App() {
         )}
       </div>
 
-      <aside className="local-warning">
-        <ShieldAlert />
-        Trusted local practice only. Submitted Go code runs on your machine with
-        time and output limits; this is not a hardened public sandbox.
-      </aside>
+      {runnerConfig.runnerMode === "local" && (
+        <aside className="local-warning">
+          <ShieldAlert />
+          Local runner — trusted code only. Submitted Go code runs with your
+          current user permissions; time and output limits are not a security
+          sandbox.
+        </aside>
+      )}
 
       <div className="utility-corner">
         <button onClick={exportProgress}>
@@ -1256,6 +1291,7 @@ function ResultsPanel({
   level,
   result,
   running,
+  runnerMode,
   expanded,
   showAll,
   onToggle,
@@ -1265,6 +1301,7 @@ function ResultsPanel({
   level: Level;
   result?: RunResult;
   running: boolean;
+  runnerMode: RunnerConfig["runnerMode"];
   expanded: Record<string, boolean>;
   showAll: boolean;
   onToggle: (id: string) => void;
@@ -1294,7 +1331,9 @@ function ResultsPanel({
       {running && (
         <div className="running-banner" aria-live="polite">
           <span className="runner-pulse" />
-          Compiling and running controlled tests…
+          {runnerMode === "docker"
+            ? "Compiling and running in a fresh Docker sandbox…"
+            : "Compiling and running with the trusted local runner…"}
         </div>
       )}
       {result && (
