@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pleft/imperative-assessment-golang/internal/assessment"
 	"github.com/pleft/imperative-assessment-golang/internal/sandboxprotocol"
 )
 
@@ -256,8 +255,8 @@ func TestDockerRunCleansUpAfterSuccessFailureAndOutputOverflow(t *testing.T) {
 				return CommandResult{}
 			}}
 			instance := testDocker(fake)
-			level, _ := assessment.FindLevel(22)
-			result := instance.Run(context.Background(), level, "func NormalizeTokens(input string) []string { return []string{\"word\"} }", []string{"l1-word"})
+			level := levelByOriginalTestID(t, "l29-01")
+			result := instance.Run(context.Background(), level, "func CountAlpha(input string) int { return 10 }", []string{"l29-02"})
 			if cleanupCalls != 1 {
 				t.Fatalf("got %d cleanup calls", cleanupCalls)
 			}
@@ -281,11 +280,11 @@ func TestDockerRunCancellationForcesCleanup(t *testing.T) {
 		return CommandResult{}
 	}}
 	instance := testDocker(fake)
-	level, _ := assessment.FindLevel(22)
+	level := levelByOriginalTestID(t, "l29-01")
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan RunResult, 1)
 	go func() {
-		done <- instance.Run(ctx, level, "func NormalizeTokens(input string) []string { for {} }", []string{"l1-word"})
+		done <- instance.Run(ctx, level, "func CountAlpha(input string) int { for {} }", []string{"l29-02"})
 	}()
 	<-started
 	cancel()
@@ -301,7 +300,7 @@ func TestDockerRunCancellationForcesCleanup(t *testing.T) {
 }
 
 func TestDockerMapsSandboxTimeoutAndRejectsMalformedResponse(t *testing.T) {
-	level, _ := assessment.FindLevel(22)
+	level := levelByOriginalTestID(t, "l29-01")
 	for _, test := range []struct {
 		name      string
 		response  string
@@ -327,8 +326,8 @@ func TestDockerMapsSandboxTimeoutAndRejectsMalformedResponse(t *testing.T) {
 			}}
 			result := testDocker(fake).Run(
 				context.Background(), level,
-				"func NormalizeTokens(input string) []string { return nil }",
-				[]string{"l1-word"},
+				"func CountAlpha(input string) int { return 0 }",
+				[]string{"l29-02"},
 			)
 			if result.TimedOut != test.wantTimed || result.FailureKind != test.wantKind {
 				t.Fatalf("unexpected result %#v", result)
@@ -351,9 +350,9 @@ func sandboxSuccessResponse(t *testing.T) CommandResult {
 	t.Helper()
 	return CommandResult{Stdout: mustJSON(t, sandboxprotocol.Response{
 		Status:          sandboxprotocol.StatusSuccess,
-		FormattedSource: "package main\n\nfunc NormalizeTokens(input string) []string { return []string{\"word\"} }\n",
+		FormattedSource: "package main\n\nfunc CountAlpha(input string) int { return 10 }\n",
 		Results: []sandboxprotocol.TestResult{{
-			ID: "l1-word", Actual: "[\"word\"]", DurationMS: 0.1,
+			ID: "l29-02", Actual: "10", DurationMS: 0.1,
 		}},
 	})}
 }
@@ -406,14 +405,14 @@ func TestDockerRunnerAtCapacity(t *testing.T) {
 		return CommandResult{Err: errors.New("gone"), Stderr: "No such container"}
 	}}
 	instance := testDocker(fake)
-	level, _ := assessment.FindLevel(22)
+	level := levelByOriginalTestID(t, "l29-01")
 	done := make(chan struct{})
 	go func() {
-		instance.Run(context.Background(), level, "func NormalizeTokens(input string) []string { return []string{\"word\"} }", []string{"l1-word"})
+		instance.Run(context.Background(), level, "func CountAlpha(input string) int { return 10 }", []string{"l29-02"})
 		close(done)
 	}()
 	<-started
-	result := instance.Run(context.Background(), level, "func NormalizeTokens(input string) []string { return nil }", []string{"l1-word"})
+	result := instance.Run(context.Background(), level, "func CountAlpha(input string) int { return 0 }", []string{"l29-02"})
 	if result.FailureKind != FailureCapacity {
 		t.Fatalf("expected capacity result, got %#v", result)
 	}
