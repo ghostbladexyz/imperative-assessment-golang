@@ -2299,6 +2299,20 @@ details[open] > summary svg:last-child {
     grid-template-columns: 1fr;
   }
 
+  .instruction-summary {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .instruction-summary > code {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .brief-action {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
   .instruction-lead {
     border-right: 0;
     border-bottom: 1px solid var(--line);
