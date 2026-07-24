@@ -15,36 +15,23 @@ func (testIssuer) Issue(levelID int, sourceHash string) (string, error) {
 }
 
 func TestRunnerAcceptsCorrectAndRejectsIncorrectCode(t *testing.T) {
-	level, _ := assessment.FindLevel(22)
+	level := levelByOriginalTestID(t, "l29-01")
 	localRunner := New("go", 1, testIssuer{})
-	correct := `func NormalizeTokens(input string) []string {
-	result := make([]string, 0)
-	current := make([]rune, 0)
-	flush := func() {
-		if len(current) > 0 {
-			result = append(result, string(current))
-			current = current[:0]
+	correct := `func CountAlpha(input string) int {
+	count := 0
+	for _, value := range input {
+		if (value >= 'a' && value <= 'z') || (value >= 'A' && value <= 'Z') {
+			count++
 		}
 	}
-	for _, r := range input {
-		if r >= 'A' && r <= 'Z' {
-			r += 'a' - 'A'
-		}
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
-			current = append(current, r)
-		} else {
-			flush()
-		}
-	}
-	flush()
-	return result
+	return count
 }`
 	result := localRunner.Run(context.Background(), level, correct, nil)
 	if !result.Passed || result.PassedCount != len(level.Tests) || result.Receipt == "" {
 		t.Fatalf("correct solution failed: %#v", result)
 	}
 
-	incorrect := `func NormalizeTokens(input string) []string { return []string{input} }`
+	incorrect := `func CountAlpha(input string) int { return 0 }`
 	result = localRunner.Run(context.Background(), level, incorrect, nil)
 	if result.Passed || result.PassedCount == len(level.Tests) {
 		t.Fatal("incorrect solution passed")
@@ -52,11 +39,11 @@ func TestRunnerAcceptsCorrectAndRejectsIncorrectCode(t *testing.T) {
 }
 
 func TestRunnerReportsCompilerErrors(t *testing.T) {
-	level, _ := assessment.FindLevel(22)
+	level := levelByOriginalTestID(t, "l29-01")
 	result := New("go", 1, nil).Run(
 		context.Background(),
 		level,
-		`func NormalizeTokens(input string) []string { definitely not go }`,
+		`func CountAlpha(input string) int { definitely not go }`,
 		nil,
 	)
 	if result.CompileError == "" {
@@ -65,15 +52,15 @@ func TestRunnerReportsCompilerErrors(t *testing.T) {
 }
 
 func TestRunnerExplainsGoDebugOutputAfterConsoleLogError(t *testing.T) {
-	level, _ := assessment.FindLevel(22)
+	level := levelByOriginalTestID(t, "l29-01")
 	result := New("go", 1, nil).Run(
 		context.Background(),
 		level,
-		`func NormalizeTokens(input string) []string {
+		`func CountAlpha(input string) int {
 			console.log(input)
-			return input
+			return 0
 		}`,
-		[]string{"l1-word"},
+		[]string{"l29-02"},
 	)
 	if !strings.Contains(result.CompileError, "Go has no console.log") ||
 		!strings.Contains(result.CompileError, "fmt.Println") {
@@ -82,29 +69,29 @@ func TestRunnerExplainsGoDebugOutputAfterConsoleLogError(t *testing.T) {
 }
 
 func TestRunnerCapturesStudentStandardOutput(t *testing.T) {
-	level, _ := assessment.FindLevel(22)
+	level := levelByOriginalTestID(t, "l29-01")
 	result := New("go", 1, nil).Run(
 		context.Background(),
 		level,
 		`import "fmt"
-		func NormalizeTokens(input string) []string {
+		func CountAlpha(input string) int {
 			fmt.Println("debug:", input)
-			return []string{}
+			return 0
 		}`,
-		[]string{"l1-symbols"},
+		[]string{"l29-01"},
 	)
-	if !strings.Contains(result.Stdout, "debug: ---___...") {
+	if !strings.Contains(result.Stdout, "debug:") {
 		t.Fatalf("expected student stdout, got %#v", result)
 	}
 }
 
 func TestRunnerTerminatesTimeout(t *testing.T) {
-	level, _ := assessment.FindLevel(22)
+	level := levelByOriginalTestID(t, "l29-01")
 	result := New("go", 1, nil).Run(
 		context.Background(),
 		level,
-		`func NormalizeTokens(input string) []string { for {} }`,
-		[]string{"l1-word"},
+		`func CountAlpha(input string) int { for {} }`,
+		[]string{"l29-02"},
 	)
 	if !result.TimedOut {
 		t.Fatalf("expected timeout, got %#v", result)
@@ -177,15 +164,15 @@ func TestFoundationalReferenceSolutionsPass(t *testing.T) {
 }
 
 func TestLocalRunnerEnforcesOutputLimit(t *testing.T) {
-	level, _ := assessment.FindLevel(22)
+	level := levelByOriginalTestID(t, "l29-01")
 	result := NewLocal("go", 1, nil).Run(
 		context.Background(),
 		level,
-		`func NormalizeTokens(input string) []string {
+		`func CountAlpha(input string) int {
 			for i := 0; i < 300000; i++ { print("output") }
-			return []string{input}
+			return 0
 		}`,
-		[]string{"l1-word"},
+		[]string{"l29-02"},
 	)
 	if result.FailureKind != FailureOutput {
 		t.Fatalf("expected output failure, got %#v", result)
@@ -193,6 +180,19 @@ func TestLocalRunnerEnforcesOutputLimit(t *testing.T) {
 	if len(result.Stderr) > MaxOutputBytes {
 		t.Fatalf("stderr was not capped: %d bytes", len(result.Stderr))
 	}
+}
+
+func levelByOriginalTestID(t *testing.T, testID string) assessment.Level {
+	t.Helper()
+	for _, level := range assessment.Levels() {
+		for _, current := range level.Tests {
+			if current.ID == testID {
+				return level
+			}
+		}
+	}
+	t.Fatalf("exercise containing test %q is missing", testID)
+	return assessment.Level{}
 }
 
 func TestFormatSourceKeepsEditablePackageDeclaration(t *testing.T) {
