@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/pleft/imperative-assessment-golang/internal/assessment"
@@ -88,5 +89,34 @@ func TestEveryStarterCompilesWithItsHarness(t *testing.T) {
 		if result.CompileError != "" {
 			t.Fatalf("level %d starter did not compile: %s", level.ID, result.CompileError)
 		}
+	}
+}
+
+func TestLocalRunnerEnforcesOutputLimit(t *testing.T) {
+	level, _ := assessment.FindLevel(1)
+	result := NewLocal("go", 1, nil).Run(
+		context.Background(),
+		level,
+		`func NormalizeTokens(input string) []string {
+			for i := 0; i < 300000; i++ { print("output") }
+			return []string{input}
+		}`,
+		[]string{"l1-word"},
+	)
+	if result.FailureKind != FailureOutput {
+		t.Fatalf("expected output failure, got %#v", result)
+	}
+	if len(result.Stderr) > MaxOutputBytes {
+		t.Fatalf("stderr was not capped: %d bytes", len(result.Stderr))
+	}
+}
+
+func TestFormatSourceRestoresAndRemovesPackageDeclaration(t *testing.T) {
+	formatted, err := FormatSource("\ufeff package main\n\nfunc solve(){ }")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(formatted, "package main") || formatted != "func solve() {}\n" {
+		t.Fatalf("unexpected formatted source %q", formatted)
 	}
 }
