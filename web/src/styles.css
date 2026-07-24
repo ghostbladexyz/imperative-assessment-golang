@@ -561,10 +561,10 @@ input:checked + .toggle::after {
 
 .workspace {
   width: 100%;
-  max-width: 1640px;
+  max-width: none;
   min-width: 0;
   margin: 0 auto;
-  padding: 30px clamp(18px, 3vw, 48px) 100px;
+  padding: 20px clamp(14px, 2vw, 28px) 100px;
 }
 
 .level-heading {
