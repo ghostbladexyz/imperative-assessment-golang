@@ -29,7 +29,7 @@ func TestDockerRunnerIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	level, _ := assessment.FindLevel(22)
+	level := levelByOriginalTestID(t, "l29-01")
 	isolationLevel := level
 	isolationLevel.Instructions.AllowedPackages = append(
 		append([]string(nil), level.Instructions.AllowedPackages...),
@@ -39,7 +39,7 @@ func TestDockerRunnerIntegration(t *testing.T) {
 	)
 
 	t.Run("correct solution passes", func(t *testing.T) {
-		result := sandbox.Run(context.Background(), level, correctLevelOneSolution, nil)
+		result := sandbox.Run(context.Background(), level, correctCountAlphaSolution, nil)
 		if !result.Passed || result.PassedCount != len(level.Tests) {
 			t.Fatalf("correct solution failed: %#v", result)
 		}
@@ -50,8 +50,8 @@ func TestDockerRunnerIntegration(t *testing.T) {
 		result := sandbox.Run(
 			context.Background(),
 			level,
-			`func NormalizeTokens(input string) []string { return []string{input} }`,
-			[]string{"l1-case"},
+			`func CountAlpha(input string) int { return 0 }`,
+			[]string{"l29-02"},
 		)
 		if result.Passed || len(result.Results) != 1 || result.Results[0].Status != "assertion" {
 			t.Fatalf("incorrect solution had unexpected result: %#v", result)
@@ -63,8 +63,8 @@ func TestDockerRunnerIntegration(t *testing.T) {
 		result := sandbox.Run(
 			context.Background(),
 			level,
-			`func NormalizeTokens(input string) []string { definitely not go }`,
-			[]string{"l1-word"},
+			`func CountAlpha(input string) int { definitely not go }`,
+			[]string{"l29-02"},
 		)
 		if result.CompileError == "" || !strings.Contains(result.CompileError, "solution.go:") {
 			t.Fatalf("missing readable compiler error: %#v", result)
@@ -76,8 +76,8 @@ func TestDockerRunnerIntegration(t *testing.T) {
 		result := sandbox.Run(
 			context.Background(),
 			level,
-			`func NormalizeTokens(input string) []string { for {} }`,
-			[]string{"l1-word"},
+			`func CountAlpha(input string) int { for {} }`,
+			[]string{"l29-02"},
 		)
 		if !result.TimedOut {
 			t.Fatalf("expected timeout: %#v", result)
@@ -92,8 +92,8 @@ func TestDockerRunnerIntegration(t *testing.T) {
 			done <- sandbox.Run(
 				ctx,
 				level,
-				`func NormalizeTokens(input string) []string { for {} }`,
-				[]string{"l1-word"},
+				`func CountAlpha(input string) int { for {} }`,
+				[]string{"l29-02"},
 			)
 		}()
 		time.Sleep(750 * time.Millisecond)
@@ -113,15 +113,15 @@ func TestDockerRunnerIntegration(t *testing.T) {
 	"net"
 	"time"
 )
-func NormalizeTokens(input string) []string {
+func CountAlpha(input string) int {
 	connection, err := net.DialTimeout("tcp", "1.1.1.1:80", 500*time.Millisecond)
 	if err == nil {
 		connection.Close()
-		return []string{"network-was-available"}
+		return 0
 	}
-	return []string{input}
+	return 10
 }`,
-			[]string{"l1-word"},
+			[]string{"l29-02"},
 		)
 		if result.PassedCount != 1 {
 			t.Fatalf("network isolation probe failed: %#v", result)
@@ -134,13 +134,13 @@ func NormalizeTokens(input string) []string {
 			context.Background(),
 			isolationLevel,
 			`import "os"
-func NormalizeTokens(input string) []string {
+func CountAlpha(input string) int {
 	if os.WriteFile("/root-write-probe", []byte("unsafe"), 0600) == nil {
-		return []string{"root-was-writable"}
+		return 0
 	}
-	return []string{input}
+	return 10
 }`,
-			[]string{"l1-word"},
+			[]string{"l29-02"},
 		)
 		if result.PassedCount != 1 {
 			t.Fatalf("read-only root probe failed: %#v", result)
@@ -153,13 +153,13 @@ func NormalizeTokens(input string) []string {
 			context.Background(),
 			isolationLevel,
 			`import "os"
-func NormalizeTokens(input string) []string {
+func CountAlpha(input string) int {
 	if _, err := os.ReadFile("/imperative-assessment-host-probe"); err == nil {
-		return []string{"host-file-was-visible"}
+		return 0
 	}
-	return []string{input}
+	return 10
 }`,
-			[]string{"l1-word"},
+			[]string{"l29-02"},
 		)
 		if result.PassedCount != 1 {
 			t.Fatalf("host file isolation probe failed: %#v", result)
@@ -171,11 +171,11 @@ func NormalizeTokens(input string) []string {
 		result := sandbox.Run(
 			context.Background(),
 			level,
-			`func NormalizeTokens(input string) []string {
+			`func CountAlpha(input string) int {
 	for i := 0; i < 300000; i++ { print("output") }
-	return []string{input}
+	return 10
 }`,
-			[]string{"l1-word"},
+			[]string{"l29-02"},
 		)
 		if result.FailureKind != FailureOutput || len(result.Stderr) > MaxOutputBytes {
 			t.Fatalf("output was not capped: %#v", result)
@@ -222,25 +222,12 @@ func assertNoAssessmentContainers(t *testing.T) {
 	}
 }
 
-const correctLevelOneSolution = `func NormalizeTokens(input string) []string {
-	result := make([]string, 0)
-	current := make([]rune, 0)
-	flush := func() {
-		if len(current) > 0 {
-			result = append(result, string(current))
-			current = current[:0]
+const correctCountAlphaSolution = `func CountAlpha(input string) int {
+	count := 0
+	for _, value := range input {
+		if (value >= 'a' && value <= 'z') || (value >= 'A' && value <= 'Z') {
+			count++
 		}
 	}
-	for _, r := range input {
-		if r >= 'A' && r <= 'Z' {
-			r += 'a' - 'A'
-		}
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
-			current = append(current, r)
-		} else {
-			flush()
-		}
-	}
-	flush()
-	return result
+	return count
 }`
