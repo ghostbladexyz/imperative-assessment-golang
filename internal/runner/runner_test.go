@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -10,12 +11,71 @@ import (
 
 type testIssuer struct{}
 
-func (testIssuer) Issue(levelID int, sourceHash string) (string, error) {
+func (testIssuer) Issue(_ int, _ string) (string, error) {
 	return "verified-receipt", nil
 }
 
+type outcomeAdapter struct {
+	outcome executionOutcome
+	plan    executionPlan
+}
+
+func (adapter *outcomeAdapter) Execute(_ context.Context, plan executionPlan) executionOutcome {
+	adapter.plan = plan
+	return adapter.outcome
+}
+
+func (*outcomeAdapter) Info() Info {
+	return Info{Mode: ModeLocal}
+}
+
+func TestEngineOwnsPreparationVerdictsAndCompletion(t *testing.T) {
+	level := mustExercise(t, "zone01/29")
+	wires := make([]wireResult, 0, len(level.Tests))
+	for _, test := range level.Tests {
+		wires = append(wires, wireResult{ID: test.ID, Actual: test.Expected})
+	}
+	adapter := &outcomeAdapter{outcome: executionOutcome{
+		status: executionSuccess, results: wires, formattedSource: "package main\n\nfunc CountAlpha(input string) int { return 0 }\n",
+	}}
+	result := newEngine(adapter, 1, testIssuer{}).Run(
+		context.Background(),
+		level,
+		"func CountAlpha(input string) int { return 0 }",
+		nil,
+	)
+	if !result.Passed || result.Receipt == "" {
+		t.Fatalf("engine did not complete the passing run: %#v", result)
+	}
+	if adapter.plan.harness == "" || adapter.plan.sourceHash == "" {
+		t.Fatalf("adapter received an incomplete execution plan: %#v", adapter.plan)
+	}
+
+	adapter.outcome = executionOutcome{status: executionCompile, compileError: "/tmp/solution.go:3: broken"}
+	result = newEngine(adapter, 1, nil).Run(
+		context.Background(),
+		level,
+		"func CountAlpha(input string) int { return 0 }",
+		nil,
+	)
+	if result.CompileError != "solution.go:3: broken" || result.Results[0].Status != "compile" {
+		t.Fatalf("engine did not own the compile verdict: %#v", result)
+	}
+
+	adapter.outcome = executionOutcome{status: executionCleanup, runtimeError: "cleanup failed"}
+	result = newEngine(adapter, 1, nil).Run(
+		context.Background(),
+		level,
+		"func CountAlpha(input string) int { return 0 }",
+		nil,
+	)
+	if result.FailureKind != FailureCleanup || result.Passed {
+		t.Fatalf("engine did not own the cleanup verdict: %#v", result)
+	}
+}
+
 func TestRunnerAcceptsCorrectAndRejectsIncorrectCode(t *testing.T) {
-	level := levelByOriginalTestID(t, "l29-01")
+	level := mustExercise(t, "zone01/29")
 	localRunner := New("go", 1, testIssuer{})
 	correct := `func CountAlpha(input string) int {
 	count := 0
@@ -39,7 +99,7 @@ func TestRunnerAcceptsCorrectAndRejectsIncorrectCode(t *testing.T) {
 }
 
 func TestRunnerReportsCompilerErrors(t *testing.T) {
-	level := levelByOriginalTestID(t, "l29-01")
+	level := mustExercise(t, "zone01/29")
 	result := New("go", 1, nil).Run(
 		context.Background(),
 		level,
@@ -52,7 +112,7 @@ func TestRunnerReportsCompilerErrors(t *testing.T) {
 }
 
 func TestRunnerExplainsGoDebugOutputAfterConsoleLogError(t *testing.T) {
-	level := levelByOriginalTestID(t, "l29-01")
+	level := mustExercise(t, "zone01/29")
 	result := New("go", 1, nil).Run(
 		context.Background(),
 		level,
@@ -69,7 +129,7 @@ func TestRunnerExplainsGoDebugOutputAfterConsoleLogError(t *testing.T) {
 }
 
 func TestRunnerCapturesStudentStandardOutput(t *testing.T) {
-	level := levelByOriginalTestID(t, "l29-01")
+	level := mustExercise(t, "zone01/29")
 	result := New("go", 1, nil).Run(
 		context.Background(),
 		level,
@@ -86,7 +146,7 @@ func TestRunnerCapturesStudentStandardOutput(t *testing.T) {
 }
 
 func TestRunnerTerminatesTimeout(t *testing.T) {
-	level := levelByOriginalTestID(t, "l29-01")
+	level := mustExercise(t, "zone01/29")
 	result := New("go", 1, nil).Run(
 		context.Background(),
 		level,
@@ -139,9 +199,10 @@ func TestFoundationalReferenceSolutionsPass(t *testing.T) {
 	}
 	localRunner := New("go", 2, nil)
 	for levelID := 1; levelID <= len(solutions); levelID++ {
-		level, found := assessment.FindLevel(levelID)
+		key := assessment.ExerciseKey(fmt.Sprintf("foundation/%d", levelID))
+		level, found := assessment.FindExercise(key)
 		if !found {
-			t.Fatalf("foundational exercise %d is missing", levelID)
+			t.Fatalf("foundational exercise %q is missing", key)
 		}
 		result := localRunner.Run(
 			context.Background(),
@@ -164,7 +225,7 @@ func TestFoundationalReferenceSolutionsPass(t *testing.T) {
 }
 
 func TestLocalRunnerEnforcesOutputLimit(t *testing.T) {
-	level := levelByOriginalTestID(t, "l29-01")
+	level := mustExercise(t, "zone01/29")
 	result := NewLocal("go", 1, nil).Run(
 		context.Background(),
 		level,
@@ -182,17 +243,13 @@ func TestLocalRunnerEnforcesOutputLimit(t *testing.T) {
 	}
 }
 
-func levelByOriginalTestID(t *testing.T, testID string) assessment.Level {
+func mustExercise(t *testing.T, key assessment.ExerciseKey) assessment.Level {
 	t.Helper()
-	for _, level := range assessment.Levels() {
-		for _, current := range level.Tests {
-			if current.ID == testID {
-				return level
-			}
-		}
+	level, found := assessment.FindExercise(key)
+	if !found {
+		t.Fatalf("exercise %q is missing", key)
 	}
-	t.Fatalf("exercise containing test %q is missing", testID)
-	return assessment.Level{}
+	return level
 }
 
 func TestFormatSourceKeepsEditablePackageDeclaration(t *testing.T) {

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"testing"
+
+	"github.com/pleft/imperative-assessment-golang/internal/assessment"
 )
 
 func TestZone01ReferenceSolutionsPass(t *testing.T) {
@@ -14,7 +16,8 @@ func TestZone01ReferenceSolutionsPass(t *testing.T) {
 	localRunner := New("go", 4, nil)
 	for originalID := 22; originalID <= 65; originalID++ {
 		originalID := originalID
-		level := levelByOriginalTestID(t, fmt.Sprintf("l%d-01", originalID))
+		key := assessment.ExerciseKey(fmt.Sprintf("zone01/%d", originalID))
+		level := mustExercise(t, key)
 		t.Run(level.Title, func(t *testing.T) {
 			result := localRunner.Run(context.Background(), level, solutions[originalID], nil)
 			if !result.Passed {

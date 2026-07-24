@@ -29,7 +29,7 @@ func TestDockerRunnerIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	level := levelByOriginalTestID(t, "l29-01")
+	level := mustExercise(t, "zone01/29")
 	isolationLevel := level
 	isolationLevel.Instructions.AllowedPackages = append(
 		append([]string(nil), level.Instructions.AllowedPackages...),

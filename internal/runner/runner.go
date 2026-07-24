@@ -37,6 +37,21 @@ const (
 	FailureStartup  = "startup"
 )
 
+type executionStatus string
+
+const (
+	executionSuccess        executionStatus = "success"
+	executionCompile        executionStatus = "compile"
+	executionCompileTimeout executionStatus = "compile_timeout"
+	executionRuntime        executionStatus = "runtime"
+	executionRuntimeTimeout executionStatus = "runtime_timeout"
+	executionStopped        executionStatus = "stopped"
+	executionOutput         executionStatus = "output"
+	executionInternal       executionStatus = "internal"
+	executionStartup        executionStatus = "startup"
+	executionCleanup        executionStatus = "cleanup"
+)
+
 var packagePattern = regexp.MustCompile(`(?m)^\s*package\s+main\s*(?:\r?\n)?`)
 
 type TestResult struct {
@@ -86,27 +101,73 @@ type Service interface {
 }
 
 type ReceiptIssuer interface {
-	Issue(levelID int, sourceHash string) (string, error)
+	Issue(int, string) (string, error)
 }
 
-type common struct {
+type executionPlan struct {
+	level      assessment.Level
+	tests      []assessment.VisibleTest
+	prepared   string
+	harness    string
+	sourceHash string
+}
+
+type executionOutcome struct {
+	status          executionStatus
+	compileError    string
+	runtimeError    string
+	failureKind     string
+	stdout          string
+	stderr          string
+	formattedSource string
+	results         []wireResult
+}
+
+type executionAdapter interface {
+	Execute(context.Context, executionPlan) executionOutcome
+	Info() Info
+}
+
+type Engine struct {
+	adapter  executionAdapter
 	slots    chan struct{}
 	receipts ReceiptIssuer
 }
 
-func newCommon(maxConcurrent int, receipts ReceiptIssuer) common {
+func newEngine(adapter executionAdapter, maxConcurrent int, receipts ReceiptIssuer) *Engine {
 	if maxConcurrent < 1 {
 		maxConcurrent = 1
 	}
-	return common{
+	return &Engine{
+		adapter:  adapter,
 		slots:    make(chan struct{}, maxConcurrent),
 		receipts: receipts,
 	}
 }
 
-func (shared *common) acquire(ctx context.Context, result *RunResult, started time.Time) bool {
+func (engine *Engine) Info() Info {
+	return engine.adapter.Info()
+}
+
+func (engine *Engine) Format(_ context.Context, source string) (string, error) {
+	return FormatSource(source)
+}
+
+func (engine *Engine) Run(ctx context.Context, level assessment.Level, source string, testIDs []string) RunResult {
+	started := time.Now()
+	result, plan, valid := prepareRun(level, source, testIDs, started)
+	if !valid || !engine.acquire(ctx, &result, started) {
+		return result
+	}
+	defer engine.release()
+
+	outcome := engine.adapter.Execute(ctx, plan)
+	return engine.complete(plan, outcome, result, len(testIDs) == 0, started)
+}
+
+func (engine *Engine) acquire(ctx context.Context, result *RunResult, started time.Time) bool {
 	select {
-	case shared.slots <- struct{}{}:
+	case engine.slots <- struct{}{}:
 		return true
 	case <-ctx.Done():
 		result.Stopped = true
@@ -120,15 +181,80 @@ func (shared *common) acquire(ctx context.Context, result *RunResult, started ti
 	}
 }
 
-func (shared *common) release() {
-	<-shared.slots
+func (engine *Engine) release() {
+	<-engine.slots
 }
 
-func (shared *common) issueReceipt(level assessment.Level, testIDs []string, result *RunResult) {
-	result.Passed = len(testIDs) == 0 && result.PassedCount == len(level.Tests)
-	if result.Passed && shared.receipts != nil {
-		result.Receipt, _ = shared.receipts.Issue(level.ID, result.SourceHash)
+func (engine *Engine) complete(
+	plan executionPlan,
+	outcome executionOutcome,
+	result RunResult,
+	wholeSuite bool,
+	started time.Time,
+) RunResult {
+	result.Stdout = outcome.stdout
+	result.Stderr = outcome.stderr
+	result.CompileError = outcome.compileError
+	result.RuntimeError = outcome.runtimeError
+	result.FailureKind = outcome.failureKind
+	applyWireResults(&result, outcome.results)
+
+	switch outcome.status {
+	case executionCompileTimeout:
+		result.TimedOut = true
+		if result.CompileError == "" {
+			result.CompileError = "Compilation exceeded the 20 second limit."
+		}
+		markAll(result.Results, "compile", result.CompileError)
+	case executionCompile:
+		result.CompileError = cleanCompilerError(result.CompileError)
+		markAll(result.Results, "compile", result.CompileError)
+	case executionRuntimeTimeout:
+		result.TimedOut = true
+		if result.RuntimeError == "" {
+			result.RuntimeError = "Execution exceeded the 4 second limit and was terminated."
+		}
+	case executionStopped:
+		result.Stopped = true
+		if result.RuntimeError == "" {
+			result.RuntimeError = "Execution was stopped."
+		}
+	case executionOutput:
+		result.FailureKind = FailureOutput
+		if result.CompileError != "" {
+			markAll(result.Results, "compile", result.CompileError)
+		}
+	case executionInternal:
+		result.FailureKind = FailureInternal
+	case executionStartup:
+		result.FailureKind = FailureStartup
+	case executionCleanup:
+		result.FailureKind = FailureCleanup
+	case executionRuntime, executionSuccess:
 	}
+
+	if outcome.formattedSource != "" {
+		withoutPackage := packagePattern.ReplaceAllString(outcome.formattedSource, "")
+		result.FormattedCode = strings.TrimSpace(withoutPackage) + "\n"
+	} else if outcome.status != executionCompile && outcome.status != executionCompileTimeout {
+		formatted, _ := FormatSource(plan.prepared)
+		withoutPackage := packagePattern.ReplaceAllString(formatted, "")
+		result.FormattedCode = strings.TrimSpace(withoutPackage) + "\n"
+	}
+
+	result.Passed = outcome.status == executionSuccess &&
+		wholeSuite &&
+		result.PassedCount == len(plan.level.Tests) &&
+		result.CompileError == "" &&
+		result.RuntimeError == "" &&
+		result.FailureKind == "" &&
+		!result.TimedOut &&
+		!result.Stopped
+	if result.Passed && engine.receipts != nil {
+		result.Receipt, _ = engine.receipts.Issue(plan.level.ID, result.SourceHash)
+	}
+	result.DurationMS = elapsedMS(started)
+	return result
 }
 
 func PrepareSource(source string) string {
@@ -153,18 +279,18 @@ func sourceHash(prepared string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func prepareRun(level assessment.Level, source string, testIDs []string, started time.Time) (RunResult, []assessment.VisibleTest, string, bool) {
+func prepareRun(level assessment.Level, source string, testIDs []string, started time.Time) (RunResult, executionPlan, bool) {
 	result := RunResult{LevelID: level.ID}
 	if len(source) > MaxSourceBytes {
 		result.CompileError = fmt.Sprintf("Source is too large. The limit is %d KiB.", MaxSourceBytes/1024)
 		result.DurationMS = elapsedMS(started)
-		return result, nil, "", false
+		return result, executionPlan{}, false
 	}
 	selected, valid := assessment.SelectTests(level, testIDs)
 	if !valid {
 		result.CompileError = "The request contains an unknown test identifier."
 		result.DurationMS = elapsedMS(started)
-		return result, nil, "", false
+		return result, executionPlan{}, false
 	}
 	result.TotalCount = len(selected)
 	for _, current := range selected {
@@ -179,9 +305,15 @@ func prepareRun(level assessment.Level, source string, testIDs []string, started
 		result.CompileError = err.Error()
 		markAll(result.Results, "compile", result.CompileError)
 		result.DurationMS = elapsedMS(started)
-		return result, selected, prepared, false
+		return result, executionPlan{}, false
 	}
-	return result, selected, prepared, true
+	return result, executionPlan{
+		level:      level,
+		tests:      selected,
+		prepared:   prepared,
+		harness:    level.BuildHarness(selected),
+		sourceHash: result.SourceHash,
+	}, true
 }
 
 func applyWireResults(result *RunResult, items []wireResult) {

@@ -17,7 +17,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pleft/imperative-assessment-golang/internal/assessment"
 	"github.com/pleft/imperative-assessment-golang/internal/sandboxprotocol"
 )
 
@@ -60,15 +59,14 @@ type DockerOptions struct {
 	BuildTimeout  time.Duration
 }
 
-type Docker struct {
+type dockerAdapter struct {
 	dockerBinary string
 	image        string
 	commands     CommandExecutor
 	random       io.Reader
-	common       common
 }
 
-func NewDocker(ctx context.Context, options DockerOptions) (*Docker, error) {
+func NewDocker(ctx context.Context, options DockerOptions) (*Engine, error) {
 	if options.DockerBinary == "" {
 		options.DockerBinary = "docker"
 	}
@@ -129,13 +127,12 @@ func NewDocker(ctx context.Context, options DockerOptions) (*Docker, error) {
 			}
 		}
 	}
-	return &Docker{
+	return newEngine(&dockerAdapter{
 		dockerBinary: options.DockerBinary,
 		image:        image,
 		commands:     options.Commands,
 		random:       options.Random,
-		common:       newCommon(options.MaxConcurrent, options.Receipts),
-	}, nil
+	}, options.MaxConcurrent, options.Receipts), nil
 }
 
 func CheckDocker(ctx context.Context, commands CommandExecutor, dockerBinary string) error {
@@ -150,7 +147,7 @@ func CheckDocker(ctx context.Context, commands CommandExecutor, dockerBinary str
 	return nil
 }
 
-func (docker *Docker) Info() Info {
+func (docker *dockerAdapter) Info() Info {
 	return Info{
 		Mode:         ModeDocker,
 		SandboxReady: true,
@@ -160,32 +157,20 @@ func (docker *Docker) Info() Info {
 	}
 }
 
-func (docker *Docker) Format(_ context.Context, source string) (string, error) {
-	return FormatSource(source)
-}
-
-func (docker *Docker) Run(ctx context.Context, level assessment.Level, source string, testIDs []string) RunResult {
-	started := time.Now()
-	result, selected, prepared, valid := prepareRun(level, source, testIDs, started)
-	if !valid || !docker.common.acquire(ctx, &result, started) {
-		return result
-	}
-	defer docker.common.release()
-
+func (docker *dockerAdapter) Execute(ctx context.Context, plan executionPlan) executionOutcome {
 	name, err := newContainerName(docker.random)
 	if err != nil {
-		result.FailureKind = FailureInternal
-		result.RuntimeError = "The sandbox could not create a unique run identifier."
-		result.DurationMS = elapsedMS(started)
-		return result
+		return executionOutcome{
+			status: executionInternal, runtimeError: "The sandbox could not create a unique run identifier.",
+		}
 	}
-	tests := make([]sandboxprotocol.ExpectedTest, 0, len(selected))
-	for _, test := range selected {
+	tests := make([]sandboxprotocol.ExpectedTest, 0, len(plan.tests))
+	for _, test := range plan.tests {
 		tests = append(tests, sandboxprotocol.ExpectedTest{ID: test.ID, Expected: test.Expected})
 	}
 	request := sandboxprotocol.Request{
-		Source:           prepared,
-		Harness:          level.BuildHarness(selected),
+		Source:           plan.prepared,
+		Harness:          plan.harness,
 		Tests:            tests,
 		CompileTimeoutMS: CompileTimeout.Milliseconds(),
 		RuntimeTimeoutMS: RuntimeTimeout.Milliseconds(),
@@ -193,10 +178,9 @@ func (docker *Docker) Run(ctx context.Context, level assessment.Level, source st
 	}
 	payload, err := json.Marshal(request)
 	if err != nil {
-		result.FailureKind = FailureInternal
-		result.RuntimeError = "The sandbox request could not be prepared."
-		result.DurationMS = elapsedMS(started)
-		return result
+		return executionOutcome{
+			status: executionInternal, runtimeError: "The sandbox request could not be prepared.",
+		}
 	}
 
 	runCtx, cancelRun := context.WithTimeout(ctx, dockerHostTimeout)
@@ -211,97 +195,80 @@ func (docker *Docker) Run(ctx context.Context, level assessment.Level, source st
 
 	cleanupErr := docker.cleanup(name)
 	if cleanupErr != nil {
-		result.Passed = false
-		result.Receipt = ""
-		result.FailureKind = FailureCleanup
-		result.RuntimeError = "The sandbox container could not be removed. Close Docker Desktop and remove only the named assessment container before trying again."
-		result.DurationMS = elapsedMS(started)
-		return result
+		return executionOutcome{
+			status:       executionCleanup,
+			runtimeError: "The sandbox container could not be removed. Close Docker Desktop and remove only the named assessment container before trying again.",
+		}
 	}
 	if errors.Is(ctx.Err(), context.Canceled) {
-		result.Stopped = true
-		result.RuntimeError = "Execution was stopped."
-		result.DurationMS = elapsedMS(started)
-		return result
+		return executionOutcome{status: executionStopped}
 	}
 	if errors.Is(runCtx.Err(), context.DeadlineExceeded) {
-		result.TimedOut = true
-		result.FailureKind = FailureStartup
-		result.RuntimeError = "The sandbox did not finish within its overall time limit and was terminated."
-		result.DurationMS = elapsedMS(started)
-		return result
+		return executionOutcome{
+			status:       executionStartup,
+			runtimeError: "The sandbox did not finish within its overall time limit and was terminated.",
+		}
 	}
 	if commandResult.OutputLimited {
-		result.FailureKind = FailureOutput
-		result.RuntimeError = "Sandbox output exceeded the response limit and execution was terminated."
-		result.DurationMS = elapsedMS(started)
-		return result
+		return executionOutcome{
+			status:       executionOutput,
+			runtimeError: "Sandbox output exceeded the response limit and execution was terminated.",
+		}
 	}
 
 	response, decodeErr := decodeSandboxResponse(commandResult.Stdout)
 	if decodeErr != nil {
-		result.FailureKind = FailureStartup
+		message := "The sandbox returned an invalid response. Restart the assessment server and try again."
 		if commandResult.Err != nil {
-			result.RuntimeError = "The sandbox container could not start. Restart Docker Desktop and try again."
-		} else {
-			result.RuntimeError = "The sandbox returned an invalid response. Restart the assessment server and try again."
+			message = "The sandbox container could not start. Restart Docker Desktop and try again."
 		}
-		result.DurationMS = elapsedMS(started)
-		return result
+		return executionOutcome{status: executionStartup, runtimeError: message}
 	}
 	if err := response.Validate(tests); err != nil {
-		result.FailureKind = FailureInternal
-		result.RuntimeError = "The sandbox returned an invalid test result."
-		result.DurationMS = elapsedMS(started)
-		return result
+		return executionOutcome{
+			status: executionInternal, runtimeError: "The sandbox returned an invalid test result.",
+		}
 	}
 
-	result.Stdout = response.Stdout
-	result.Stderr = response.Stderr
-	result.CompileError = response.CompileError
-	result.RuntimeError = response.RuntimeError
 	wires := make([]wireResult, 0, len(response.Results))
 	for _, item := range response.Results {
 		wires = append(wires, wireResult{
 			ID: item.ID, Actual: item.Actual, Failure: item.Failure, DurationMS: item.DurationMS,
 		})
 	}
-	applyWireResults(&result, wires)
+	outcome := executionOutcome{
+		status:          executionSuccess,
+		compileError:    response.CompileError,
+		runtimeError:    response.RuntimeError,
+		stdout:          response.Stdout,
+		stderr:          response.Stderr,
+		formattedSource: response.FormattedSource,
+		results:         wires,
+	}
 	switch response.Status {
 	case sandboxprotocol.StatusCompileTimeout:
-		result.TimedOut = true
-		if result.CompileError == "" {
-			result.CompileError = "Compilation exceeded the 20 second limit."
-		}
-		markAll(result.Results, "compile", result.CompileError)
+		outcome.status = executionCompileTimeout
 	case sandboxprotocol.StatusCompile:
-		result.CompileError = cleanCompilerError(result.CompileError)
-		markAll(result.Results, "compile", result.CompileError)
+		outcome.status = executionCompile
 	case sandboxprotocol.StatusRuntimeTimeout:
-		result.TimedOut = true
-		if result.RuntimeError == "" {
-			result.RuntimeError = "Execution exceeded the 4 second limit and was terminated."
-		}
+		outcome.status = executionRuntimeTimeout
 	case sandboxprotocol.StatusStopped:
-		result.Stopped = true
+		outcome.status = executionStopped
 	case sandboxprotocol.StatusOutput:
-		result.FailureKind = FailureOutput
+		outcome.status = executionOutput
 	case sandboxprotocol.StatusInternal:
-		result.FailureKind = FailureInternal
-		if result.RuntimeError == "" {
-			result.RuntimeError = "The sandbox could not complete this run."
+		outcome.status = executionInternal
+		if outcome.runtimeError == "" {
+			outcome.runtimeError = "The sandbox could not complete this run."
 		}
+	case sandboxprotocol.StatusRuntime:
+		outcome.status = executionRuntime
+	case sandboxprotocol.StatusSuccess, sandboxprotocol.StatusAssertion:
 	}
-	if response.FormattedSource != "" {
-		withoutPackage := packagePattern.ReplaceAllString(response.FormattedSource, "")
-		result.FormattedCode = strings.TrimSpace(withoutPackage) + "\n"
-	}
-	docker.common.issueReceipt(level, testIDs, &result)
-	result.DurationMS = elapsedMS(started)
-	return result
+	return outcome
 }
 
-func (docker *Docker) cleanup(name string) error {
+func (docker *dockerAdapter) cleanup(name string) error {
 	if !containerNamePattern.MatchString(name) {
 		return errors.New("invalid container name")
 	}

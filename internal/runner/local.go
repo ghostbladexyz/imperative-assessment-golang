@@ -8,17 +8,14 @@ import (
 	"runtime"
 	"strings"
 	"time"
-
-	"github.com/pleft/imperative-assessment-golang/internal/assessment"
 )
 
-type Local struct {
+type localAdapter struct {
 	goBinary  string
 	goVersion string
-	common    common
 }
 
-func NewLocal(goBinary string, maxConcurrent int, receipts ReceiptIssuer) *Local {
+func NewLocal(goBinary string, maxConcurrent int, receipts ReceiptIssuer) *Engine {
 	if goBinary == "" {
 		goBinary = "go"
 	}
@@ -28,20 +25,19 @@ func NewLocal(goBinary string, maxConcurrent int, receipts ReceiptIssuer) *Local
 	if output, _, err, _ := runCommand(versionCtx, 8*1024, goBinary, "version"); err == nil {
 		version = strings.TrimSpace(output)
 	}
-	return &Local{
+	return newEngine(&localAdapter{
 		goBinary:  goBinary,
 		goVersion: version,
-		common:    newCommon(maxConcurrent, receipts),
-	}
+	}, maxConcurrent, receipts)
 }
 
 // New preserves the original constructor for packages that explicitly depend on
 // the trusted local runner.
-func New(goBinary string, maxConcurrent int, receipts ReceiptIssuer) *Local {
+func New(goBinary string, maxConcurrent int, receipts ReceiptIssuer) *Engine {
 	return NewLocal(goBinary, maxConcurrent, receipts)
 }
 
-func (local *Local) Info() Info {
+func (local *localAdapter) Info() Info {
 	return Info{
 		Mode:         ModeLocal,
 		SandboxReady: false,
@@ -50,24 +46,12 @@ func (local *Local) Info() Info {
 	}
 }
 
-func (local *Local) Format(_ context.Context, source string) (string, error) {
-	return FormatSource(source)
-}
-
-func (local *Local) Run(ctx context.Context, level assessment.Level, source string, testIDs []string) RunResult {
-	started := time.Now()
-	result, selected, prepared, valid := prepareRun(level, source, testIDs, started)
-	if !valid || !local.common.acquire(ctx, &result, started) {
-		return result
-	}
-	defer local.common.release()
-
+func (local *localAdapter) Execute(ctx context.Context, plan executionPlan) executionOutcome {
 	tempDir, err := os.MkdirTemp("", "imperative-assessment-*")
 	if err != nil {
-		result.RuntimeError = "Could not create an isolated temporary run directory."
-		result.FailureKind = FailureInternal
-		result.DurationMS = elapsedMS(started)
-		return result
+		return executionOutcome{
+			status: executionInternal, runtimeError: "Could not create an isolated temporary run directory.",
+		}
 	}
 	defer os.RemoveAll(tempDir)
 
@@ -77,17 +61,15 @@ func (local *Local) Run(ctx context.Context, level assessment.Level, source stri
 	if runtime.GOOS == "windows" {
 		executablePath += ".exe"
 	}
-	if err := os.WriteFile(solutionPath, []byte(prepared), 0o600); err != nil {
-		result.RuntimeError = "Could not prepare the submitted source."
-		result.FailureKind = FailureInternal
-		result.DurationMS = elapsedMS(started)
-		return result
+	if err := os.WriteFile(solutionPath, []byte(plan.prepared), 0o600); err != nil {
+		return executionOutcome{
+			status: executionInternal, runtimeError: "Could not prepare the submitted source.",
+		}
 	}
-	if err := os.WriteFile(harnessPath, []byte(level.BuildHarness(selected)), 0o600); err != nil {
-		result.RuntimeError = "Could not prepare the controlled test harness."
-		result.FailureKind = FailureInternal
-		result.DurationMS = elapsedMS(started)
-		return result
+	if err := os.WriteFile(harnessPath, []byte(plan.harness), 0o600); err != nil {
+		return executionOutcome{
+			status: executionInternal, runtimeError: "Could not prepare the controlled test harness.",
+		}
 	}
 
 	buildCtx, cancelBuild := context.WithTimeout(ctx, CompileTimeout)
@@ -96,52 +78,47 @@ func (local *Local) Run(ctx context.Context, level assessment.Level, source stri
 		"build", "-trimpath", "-o", executablePath, solutionPath, harnessPath,
 	)
 	cancelBuild()
-	result.Stdout = buildStdout
-	result.Stderr = buildStderr
 	if buildErr != nil {
+		outcome := executionOutcome{status: executionCompile, stdout: buildStdout, stderr: buildStderr}
 		switch {
 		case errors.Is(buildCtx.Err(), context.DeadlineExceeded):
-			result.TimedOut = true
-			result.CompileError = "Compilation exceeded the 20 second limit."
+			outcome.status = executionCompileTimeout
 		case errors.Is(ctx.Err(), context.Canceled):
-			result.Stopped = true
+			outcome.status = executionStopped
 		case buildLimited:
-			result.FailureKind = FailureOutput
-			result.CompileError = "Compiler output exceeded the 256 KiB limit."
+			outcome.status = executionOutput
+			outcome.compileError = "Compiler output exceeded the 256 KiB limit."
 		default:
-			result.CompileError = cleanCompilerError(buildStderr)
+			outcome.compileError = buildStderr
 		}
-		markAll(result.Results, "compile", result.CompileError)
-		result.DurationMS = elapsedMS(started)
-		return result
+		return outcome
 	}
 
 	runCtx, cancelRun := context.WithTimeout(ctx, RuntimeTimeout)
 	runStdout, runStderr, runErr, runLimited := runCommand(runCtx, MaxOutputBytes, executablePath)
 	cancelRun()
-	result.Stdout = stripMarkers(runStdout)
-	result.Stderr = runStderr
-	applyWireResults(&result, parseResults(runStdout))
+	outcome := executionOutcome{
+		status:  executionSuccess,
+		stdout:  stripMarkers(runStdout),
+		stderr:  runStderr,
+		results: parseResults(runStdout),
+	}
 	if runErr != nil {
 		switch {
 		case errors.Is(runCtx.Err(), context.DeadlineExceeded):
-			result.TimedOut = true
-			result.RuntimeError = "Execution exceeded the 4 second limit and was terminated."
+			outcome.status = executionRuntimeTimeout
 		case errors.Is(ctx.Err(), context.Canceled):
-			result.Stopped = true
-			result.RuntimeError = "Execution was stopped."
+			outcome.status = executionStopped
 		case runLimited:
-			result.FailureKind = FailureOutput
-			result.RuntimeError = "Program output exceeded the 256 KiB limit and execution was terminated."
+			outcome.status = executionOutput
+			outcome.runtimeError = "Program output exceeded the 256 KiB limit and execution was terminated."
 		default:
-			result.RuntimeError = strings.TrimSpace(runStderr)
-			if result.RuntimeError == "" {
-				result.RuntimeError = "The program exited before completing every test."
+			outcome.status = executionRuntime
+			outcome.runtimeError = strings.TrimSpace(runStderr)
+			if outcome.runtimeError == "" {
+				outcome.runtimeError = "The program exited before completing every test."
 			}
 		}
 	}
-	local.common.issueReceipt(level, testIDs, &result)
-	result.FormattedCode, _ = FormatSource(source)
-	result.DurationMS = elapsedMS(started)
-	return result
+	return outcome
 }

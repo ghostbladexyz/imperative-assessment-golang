@@ -255,7 +255,7 @@ func TestDockerRunCleansUpAfterSuccessFailureAndOutputOverflow(t *testing.T) {
 				return CommandResult{}
 			}}
 			instance := testDocker(fake)
-			level := levelByOriginalTestID(t, "l29-01")
+			level := mustExercise(t, "zone01/29")
 			result := instance.Run(context.Background(), level, "func CountAlpha(input string) int { return 10 }", []string{"l29-02"})
 			if cleanupCalls != 1 {
 				t.Fatalf("got %d cleanup calls", cleanupCalls)
@@ -280,7 +280,7 @@ func TestDockerRunCancellationForcesCleanup(t *testing.T) {
 		return CommandResult{}
 	}}
 	instance := testDocker(fake)
-	level := levelByOriginalTestID(t, "l29-01")
+	level := mustExercise(t, "zone01/29")
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan RunResult, 1)
 	go func() {
@@ -300,7 +300,7 @@ func TestDockerRunCancellationForcesCleanup(t *testing.T) {
 }
 
 func TestDockerMapsSandboxTimeoutAndRejectsMalformedResponse(t *testing.T) {
-	level := levelByOriginalTestID(t, "l29-01")
+	level := mustExercise(t, "zone01/29")
 	for _, test := range []struct {
 		name      string
 		response  string
@@ -336,14 +336,13 @@ func TestDockerMapsSandboxTimeoutAndRejectsMalformedResponse(t *testing.T) {
 	}
 }
 
-func testDocker(commands CommandExecutor) *Docker {
-	return &Docker{
+func testDocker(commands CommandExecutor) *Engine {
+	return newEngine(&dockerAdapter{
 		dockerBinary: "docker",
 		image:        "runner:test",
 		commands:     commands,
 		random:       bytes.NewReader(bytes.Repeat([]byte{7}, 128)),
-		common:       newCommon(1, nil),
-	}
+	}, 1, nil)
 }
 
 func sandboxSuccessResponse(t *testing.T) CommandResult {
@@ -405,7 +404,7 @@ func TestDockerRunnerAtCapacity(t *testing.T) {
 		return CommandResult{Err: errors.New("gone"), Stderr: "No such container"}
 	}}
 	instance := testDocker(fake)
-	level := levelByOriginalTestID(t, "l29-01")
+	level := mustExercise(t, "zone01/29")
 	done := make(chan struct{})
 	go func() {
 		instance.Run(context.Background(), level, "func CountAlpha(input string) int { return 10 }", []string{"l29-02"})
