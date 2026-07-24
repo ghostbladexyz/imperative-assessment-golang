@@ -145,12 +145,12 @@ func TestLocalRunnerEnforcesOutputLimit(t *testing.T) {
 	}
 }
 
-func TestFormatSourceRestoresAndRemovesPackageDeclaration(t *testing.T) {
+func TestFormatSourceKeepsEditablePackageDeclaration(t *testing.T) {
 	formatted, err := FormatSource("\ufeff package main\n\nfunc solve(){ }")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(formatted, "package main") || formatted != "func solve() {}\n" {
+	if formatted != "package main\n\nfunc solve() {}\n" {
 		t.Fatalf("unexpected formatted source %q", formatted)
 	}
 }
