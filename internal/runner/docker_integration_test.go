@@ -29,7 +29,7 @@ func TestDockerRunnerIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	level, _ := assessment.FindLevel(1)
+	level, _ := assessment.FindLevel(22)
 	isolationLevel := level
 	isolationLevel.Instructions.AllowedPackages = append(
 		append([]string(nil), level.Instructions.AllowedPackages...),
