@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-const exerciseCount = 65
+const exerciseCount = 171
 
 func baseInstructions(objective, contract, input, output, starter string) Instructions {
 	return Instructions{
@@ -30,13 +30,14 @@ func test(id, name, purpose, input, expected string, payload any) VisibleTest {
 }
 
 func Levels() []Level {
-	levels := append(foundationalLevels(), zone01Levels()...)
+	levels := append(foundationalLevels(), piscineLevels()...)
+	levels = append(levels, zone01Levels()...)
 	for index := range levels {
+		levels[index].ID = index + 1
 		levels[index].StarterCode = "package main\n\n" + levels[index].StarterCode
 	}
 	return levels
 }
-
 func Validate() error {
 	levels := Levels()
 	if len(levels) != exerciseCount {
