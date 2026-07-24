@@ -1285,8 +1285,83 @@ details[open] > summary svg:last-child {
 
 .test-list {
   min-height: 0;
-  flex: 1;
+  max-height: 620px;
+  flex: 1 1 auto;
   overflow: auto;
+}
+
+.console-panel {
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--line-strong);
+  background: var(--code);
+  color: var(--code-ink);
+}
+
+.console-panel > summary {
+  min-height: 38px;
+  display: grid;
+  grid-template-columns: 1fr auto 18px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.console-panel > summary > span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font: 700 11px/1 var(--mono);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.console-panel > summary svg {
+  width: 14px;
+}
+
+.console-panel > summary small {
+  color: #96a096;
+  font: 10px/1 var(--mono);
+}
+
+.console-body {
+  max-height: 280px;
+  overflow: auto;
+  border-top: 1px solid #343b34;
+}
+
+.console-body > p {
+  margin: 0;
+  padding: 12px;
+  color: #aeb7ae;
+  font: 11px/1.55 var(--mono);
+}
+
+.console-stream {
+  border-bottom: 1px solid #303730;
+}
+
+.console-stream > span {
+  display: block;
+  padding: 7px 12px 0;
+  color: #75c995;
+  font: 700 9px/1 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.console-stream.error > span {
+  color: #f18c87;
+}
+
+.console-stream pre {
+  margin: 0;
+  padding: 8px 12px 12px;
+  overflow: auto;
+  color: var(--code-ink);
+  font: 11px/1.55 var(--mono);
+  white-space: pre-wrap;
 }
 
 .test-case {
