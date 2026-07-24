@@ -7,18 +7,16 @@ import (
 
 func TestSourcePolicyAcceptsDocumentedBuiltinsAndPackages(t *testing.T) {
 	t.Parallel()
-	level, _ := FindLevel(22)
+	level := findLevelByTitle(t, "Concat Slice")
 	source := `package main
 
-import "strings"
+import "fmt"
 
-func helper(value string) string { return strings.ToLower(value) }
-func NormalizeTokens(input string) []string {
-	values := make([]string, 0)
-	if len(input) > 0 {
-		values = append(values, helper(input))
-		println(input)
-	}
+func ConcatSlice(left, right []int) []int {
+	fmt.Println("joining")
+	values := []int{}
+	values = append(values, left...)
+	values = append(values, right...)
 	return values
 }`
 	if err := ValidateSourcePolicy(level, source); err != nil {
@@ -28,10 +26,10 @@ func NormalizeTokens(input string) []string {
 
 func TestSourcePolicyRejectsUnlistedBuiltin(t *testing.T) {
 	t.Parallel()
-	level, _ := FindLevel(22)
+	level := findLevelByTitle(t, "Concat Slice")
 	source := `package main
-func NormalizeTokens(input string) []string {
-	values := []string{input}
+func ConcatSlice(left, right []int) []int {
+	values := []int{}
 	copy(values, values)
 	return values
 }`
@@ -43,11 +41,11 @@ func NormalizeTokens(input string) []string {
 
 func TestSourcePolicyRejectsAliasedUnlistedBuiltin(t *testing.T) {
 	t.Parallel()
-	level, _ := FindLevel(22)
+	level := findLevelByTitle(t, "Concat Slice")
 	source := `package main
-func NormalizeTokens(input string) []string {
+func ConcatSlice(left, right []int) []int {
 	forbidden := copy
-	values := []string{input}
+	values := []int{}
 	forbidden(values, values)
 	return values
 }`
@@ -59,14 +57,26 @@ func NormalizeTokens(input string) []string {
 
 func TestSourcePolicyRejectsUnlistedPackage(t *testing.T) {
 	t.Parallel()
-	level, _ := FindLevel(22)
+	level := findLevelByTitle(t, "Concat Slice")
 	source := `package main
 import "regexp"
-func NormalizeTokens(input string) []string {
-	return []string{regexp.MustCompile(".").FindString(input)}
+func ConcatSlice(left, right []int) []int {
+	_ = regexp.MustCompile(".")
+	return left
 }`
 	err := ValidateSourcePolicy(level, source)
 	if err == nil || !strings.Contains(err.Error(), `package "regexp" is not allowed`) {
 		t.Fatalf("unexpected policy error: %v", err)
 	}
+}
+
+func findLevelByTitle(t *testing.T, title string) Level {
+	t.Helper()
+	for _, level := range Levels() {
+		if level.Title == title {
+			return level
+		}
+	}
+	t.Fatalf("missing level %q", title)
+	return Level{}
 }
