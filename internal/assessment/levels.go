@@ -330,7 +330,14 @@ func levelFive() Level {
 		"An unfinished handler factory is provided.",
 	)
 	instructions.Constraints = []string{"No external server or network.", "Trim the name before using it.", "Reject trailing JSON values and unknown fields.", "All response bodies must be JSON objects.", "Set Content-Type before WriteHeader."}
-	instructions.Examples = []Example{{Input: `POST /greet {"name":"Ada"}`, Output: `200 {"message":"Hello, Ada!"}`}, {Input: `GET /greet`, Output: `405, Allow: POST`}}
+	instructions.Examples = []Example{
+		{Input: `POST /greet {"name":"Ada"}`, Output: `200 application/json {"message":"Hello, Ada!"}`},
+		{Input: `POST /greet {"name":"  Lin  "}`, Output: `200 application/json {"message":"Hello, Lin!"}`},
+		{Input: `GET /greet`, Output: `405 application/json with Allow: POST`},
+		{Input: `POST /other {"name":"Ada"}`, Output: `404 application/json`},
+		{Input: `POST /greet {"name":"","admin":true}`, Output: `400 application/json`},
+	}
+	setSourcePolicy(&instructions, []string{"len"}, []string{"encoding/json", "fmt", "io", "net/http", "strings"})
 	instructions.Documentation = []DocumentationLink{{Label: "net/http", URL: "https://pkg.go.dev/net/http"}, {Label: "httptest", URL: "https://pkg.go.dev/net/http/httptest"}, {Label: "encoding/json Decoder", URL: "https://pkg.go.dev/encoding/json#Decoder"}}
 	instructions.Hints = []string{"Check the path, then method, before decoding.", "Use json.Decoder.DisallowUnknownFields.", "Decode once into the request, then ensure a second decode returns io.EOF."}
 	instructions.CommonPitfalls = []string{"Writing status before headers", "Accepting whitespace-only names", "Returning plain-text errors"}
