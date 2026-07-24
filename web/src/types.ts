@@ -126,7 +126,6 @@ export interface Settings {
   autoTest: boolean;
   fontSize: number;
   reducedMotion: boolean;
-  panelRatio: number;
 }
 
 export interface SavedProgress {

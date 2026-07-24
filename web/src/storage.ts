@@ -21,7 +21,6 @@ export const defaultSettings = (): Settings => ({
   reducedMotion:
     typeof window !== "undefined" &&
     window.matchMedia?.("(prefers-reduced-motion: reduce)").matches,
-  panelRatio: 55,
 });
 
 export const defaultTimer = (): TimerState => ({
@@ -138,13 +137,6 @@ export function validateImport(value: unknown, levels: Level[]): SavedProgress {
       Math.max(12, finiteNonNegative(value.settings.fontSize) || defaults.fontSize),
     ),
     reducedMotion: value.settings.reducedMotion === true,
-    panelRatio: Math.min(
-      70,
-      Math.max(
-        35,
-        finiteNonNegative(value.settings.panelRatio) || defaults.panelRatio,
-      ),
-    ),
   };
   clean.updatedAt = Date.now();
   return clean;
@@ -208,4 +200,3 @@ export function isLevelUnlocked(
     progress.levels[String(levelId - 1)]?.passed === true
   );
 }
-
