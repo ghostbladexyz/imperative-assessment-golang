@@ -238,7 +238,11 @@ func cleanCompilerError(message string) string {
 			lines[index] = "assessment tests:" + line[marker+len("/assessment_harness.go:"):]
 		}
 	}
-	return strings.Join(lines, "\n")
+	cleaned := strings.Join(lines, "\n")
+	if strings.Contains(cleaned, "undefined: console") {
+		cleaned += "\n\nGo has no console.log. Import \"fmt\" and use fmt.Println(...), or use print/println. Runtime output appears in the Console after the program compiles."
+	}
+	return cleaned
 }
 
 func elapsedMS(started time.Time) float64 {
