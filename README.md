@@ -1,35 +1,34 @@
 # Imperative Go Practice Assessment
 
-A local, browser-based practice assessment with 30 Go exercises, automatic
-tests, console feedback, and saved progress. Submitted code runs in a restricted
-Docker container by default.
+A local, browser-based practice assessment with 171 Go exercises, automatic
+tests, console feedback, and saved progress. It starts with foundational
+problems and progresses through checkpoint-style challenges. Submitted code
+runs in a restricted Docker container by default.
 
-The exercises are original practice material, not copied from an official
-Zone01 assessment.
+This is an unofficial practice tool and is not affiliated with Zone01.
+Exercises 22–65 adapt the public
+[Go checkpoint catalogue](https://github.com/software-sappho/.go-checkpoints-solutions/tree/main)
+using the canonical [01-edu subjects](https://github.com/01-edu/public/tree/master/subjects)
+for their contracts and examples.
 
 ## Requirements
 
 - Go 1.23 or newer
 - Docker Desktop or Docker Engine with a running Linux-container daemon
 
-GNU Make is recommended for the command shortcuts below. Node.js 20.19+ or
-22.12+ and npm are only required for frontend development.
+That is everything needed to run the application. The compiled frontend is
+included in the repository, so students do not need Node.js or npm.
 
-## Run with Docker
+## Quick start
 
 ```sh
-make run
+go run ./cmd/server -open
 ```
 
 The first run builds the pinned sandbox image, starts the server, and opens
 [http://127.0.0.1:8080](http://127.0.0.1:8080). Later runs reuse the image while
-its inputs remain unchanged.
-
-Without Make:
-
-```sh
-go run ./cmd/server -runner docker -open
-```
+its inputs remain unchanged. Keep the terminal open while using the app, and
+press `Ctrl+C` there to stop it.
 
 Docker mode gives each submission a disposable container with no network,
 a read-only root filesystem, dropped capabilities, resource limits, and no host
@@ -39,24 +38,35 @@ full trust model.
 
 ## Optional local runner
 
-For trusted code only:
+If Docker is unavailable, trusted code can run directly on the host:
 
 ```sh
-make run-local
+go run ./cmd/server -runner local -open
 ```
 
 The local runner executes submissions with your operating-system permissions.
 It keeps the same execution and output limits but is not a sandbox.
 
+## Using the assessment
+
+- Work through the exercises in order; passing every visible test unlocks the
+  next exercise.
+- Use **Test** for feedback, **gofmt** to format the code, and **.go** to download
+  the current solution.
+- Progress and editor layout are saved in the browser on the current device.
+- Drag the panel dividers to resize the instructions, editor, tests, and console.
+
 ## Development
 
-Install the locked frontend dependencies once:
+The React/TypeScript source is already built and embedded under
+`internal/web/dist`. Node.js and npm are only needed when changing that source
+or running its checks. Install the locked dependencies with:
 
 ```sh
-make frontend-install
+npm --prefix web ci
 ```
 
-Run the full verification suite:
+GNU Make is optional, but provides shortcuts:
 
 ```sh
 make check
@@ -68,6 +78,7 @@ Common targets:
 | --- | --- |
 | `make run` | Start with the Docker sandbox |
 | `make run-local` | Start with the trusted local runner |
+| `make check` | Run Go and frontend verification |
 | `make frontend-dev` | Start the Vite development server |
 | `make frontend-build` | Rebuild the embedded frontend |
 | `make test` | Run the Go test suite |
@@ -77,6 +88,9 @@ Common targets:
 For live frontend development, run `make run` and `make frontend-dev` in
 separate terminals, then open
 [http://127.0.0.1:5173](http://127.0.0.1:5173).
+
+The GitHub Actions workflow runs Go formatting, vetting and tests, frontend
+linting, tests and build, and a Docker image build on every pull request.
 
 ## License
 
