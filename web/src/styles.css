@@ -2444,8 +2444,13 @@ details[open] > summary svg:last-child {
     min-width: 15px;
   }
 
+  .editor-panel {
+    height: 72vh;
+    min-height: 520px;
+  }
+
   .editor-panel .cm-editor {
-    height: 440px;
+    height: 100%;
   }
 
   .editor-footer > span {
