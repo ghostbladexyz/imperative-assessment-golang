@@ -947,9 +947,40 @@ details[open] > summary svg:last-child {
   margin: 6px 0;
 }
 
+.allowlist {
+  display: block;
+  padding: 9px 10px;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--line);
+  background: var(--code);
+  color: var(--code-ink);
+  font: 11px/1.55 var(--mono);
+}
+
+.console-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--blue);
+  background: color-mix(in srgb, var(--blue) 8%, var(--paper));
+}
+
+.console-note > svg {
+  width: 17px;
+  flex: 0 0 auto;
+  color: var(--blue);
+}
+
+.console-note code {
+  font-family: var(--mono);
+}
+
 .workbench {
   min-width: 0;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
   align-items: stretch;
 }
 
