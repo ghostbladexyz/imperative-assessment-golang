@@ -9,7 +9,6 @@ import {
 } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { go } from "@codemirror/lang-go";
-import { EditorView } from "@codemirror/view";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -812,6 +811,18 @@ function App() {
                     <button className="text-button" onClick={() => void gofmt()}>
                       <Sparkles /> gofmt
                     </button>
+                    <button
+                      className="text-button"
+                      onClick={() => void toggleEditorFullscreen()}
+                      aria-label={
+                        editorFullscreen
+                          ? "Exit editor fullscreen"
+                          : "Open editor fullscreen"
+                      }
+                    >
+                      {editorFullscreen ? <Minimize2 /> : <Maximize2 />}
+                      {editorFullscreen ? "Exit full screen" : "Full screen"}
+                    </button>
                   </div>
                 </div>
                 <div className="package-line" aria-label="Protected package line">
@@ -882,19 +893,6 @@ function App() {
                   </div>
                 </div>
               </div>
-
-              <label className="panel-resizer">
-                <span className="sr-only">Panel balance</span>
-                <input
-                  type="range"
-                  min="35"
-                  max="70"
-                  value={progress.settings.panelRatio}
-                  onChange={(event) =>
-                    patchSettings({ panelRatio: Number(event.target.value) })
-                  }
-                />
-              </label>
 
               <ResultsPanel
                 level={currentLevel}
@@ -1167,21 +1165,25 @@ function InstructionsPanel({
   onUseHint: (index: number) => void;
 }) {
   return (
-    <section className="instructions panel">
-      <div className="instruction-lead">
-        <p className="eyebrow">Objective</p>
-        <h3>{level.instructions.objective}</h3>
+    <details className="instructions panel">
+      <summary className="instruction-summary">
+        <span>
+          <em>Exercise brief</em>
+          <strong>{level.instructions.objective}</strong>
+        </span>
         <code>{level.signature}</code>
+        <span className="brief-action">
+          Read full specification <ChevronDown />
+        </span>
+      </summary>
+      <div className="instruction-content">
         <p className="starter-note">{level.instructions.starterNote}</p>
-      </div>
-      <div className="contract-grid">
-        <InfoBlock title="Input">{level.instructions.input}</InfoBlock>
-        <InfoBlock title="Expected output">{level.instructions.output}</InfoBlock>
-      </div>
-      <details>
-        <summary>
-          Contract, constraints & examples <ChevronDown />
-        </summary>
+        <div className="contract-grid">
+          <InfoBlock title="Input">{level.instructions.input}</InfoBlock>
+          <InfoBlock title="Expected output">
+            {level.instructions.output}
+          </InfoBlock>
+        </div>
         <div className="details-body">
           <h4>Contract</h4>
           <p>{level.instructions.contract}</p>
