@@ -150,7 +150,7 @@ func routes(api *api) (http.Handler, error) {
 		writeJSON(writer, http.StatusOK, health)
 	})
 	mux.HandleFunc("GET /api/levels", func(writer http.ResponseWriter, _ *http.Request) {
-		writeJSON(writer, http.StatusOK, map[string]any{"levels": assessment.PublicLevels(), "schemaVersion": 1})
+		writeJSON(writer, http.StatusOK, map[string]any{"levels": assessment.PublicLevels(), "schemaVersion": 2})
 	})
 	mux.HandleFunc("POST /api/run", api.run)
 	mux.HandleFunc("POST /api/format", api.format)
