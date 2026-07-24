@@ -9,9 +9,10 @@ import (
 // Duplicate solution variants and exercises already represented elsewhere in
 // the curriculum are intentionally omitted.
 func piscineLevels() []Level {
-	specs := make([]practiceSpec, 0, 32)
+	specs := make([]practiceSpec, 0, 56)
 specs = append(specs, piscineQuestTwoSpecs()...)
 specs = append(specs, piscineQuestThreeAndFourSpecs()...)
+specs = append(specs, piscineQuestFiveSpecs()...)
 
 	levels := make([]Level, 0, len(specs))
 	for _, spec := range specs {
@@ -212,6 +213,163 @@ func piscineQuestThreeAndFourSpecs() []practiceSpec {
 				intCase("Even", 2, 1),
 				intCase("Sequence", 12, 9),
 			}),
+	}
+}
+
+func piscineQuestFiveSpecs() []practiceSpec {
+	return []practiceSpec{
+		piscineSpec(1033, "Concatenate", "Piscine Quest 5", "Concat(left string, right string) string",
+			"Join two strings without a separator.", "Two strings.", "left immediately followed by right.",
+			nil, twoStringsFields, "Concat(current.Payload.Left, current.Payload.Right)", `""`,
+			[]practiceCase{
+				twoStringOutputCase("Both empty", "", "", ""),
+				twoStringOutputCase("Left empty", "", "go", "go"),
+				twoStringOutputCase("Right empty", "go", "", "go"),
+				twoStringOutputCase("Both", "go", "pher", "gopher"),
+			}),
+		piscineSpec(1034, "Basic Join", "Piscine Quest 5", "BasicJoin(values []string) string",
+			"Concatenate every string in a slice.", "One string slice.", "All elements joined without a separator.",
+			nil, stringsField, "BasicJoin(current.Payload.Values)", `""`,
+			[]practiceCase{
+				stringsOutputCase("Empty", []string{}, ""),
+				stringsOutputCase("One", []string{"go"}, "go"),
+				stringsOutputCase("Several", []string{"go", "pher"}, "gopher"),
+				stringsOutputCase("Includes empty", []string{"a", "", "b"}, "ab"),
+			}),
+		piscineSpec(1035, "Compare Strings", "Piscine Quest 5", "Compare(left string, right string) int",
+			"Compare two strings lexicographically.", "Two strings.", "-1 when left is smaller, 0 when equal, and 1 when greater.",
+			nil, twoStringsFields, "Compare(current.Payload.Left, current.Payload.Right)", `0`,
+			[]practiceCase{
+				twoStringIntCase("Equal", "abc", "abc", 0),
+				twoStringIntCase("Less", "abc", "abd", -1),
+				twoStringIntCase("Greater", "z", "a", 1),
+				twoStringIntCase("Prefix", "go", "gopher", -1),
+			}),
+		piscineSpec(1036, "First Rune", "Piscine Quest 5", "FirstRune(value string) rune",
+			"Return the first Unicode code point.", "A non-empty UTF-8 string.", "Its first rune.",
+			nil, stringField, "FirstRune(current.Payload.Value)", `0`,
+			[]practiceCase{
+				runeOutputCase("ASCII", "go", 'g'),
+				runeOutputCase("Greek", "?Ó?‡", '?'),
+				runeOutputCase("Emoji", "??ok", '??'),
+			}),
+		piscineSpec(1037, "Last Rune", "Piscine Quest 5", "LastRune(value string) rune",
+			"Return the final Unicode code point.", "A non-empty UTF-8 string.", "Its last rune.",
+			nil, stringField, "LastRune(current.Payload.Value)", `0`,
+			[]practiceCase{
+				runeOutputCase("ASCII", "go", 'o'),
+				runeOutputCase("Greek", "?Ó?‡", '‡'),
+				runeOutputCase("Emoji", "ok??", '??'),
+			}),
+		piscineSpec(1038, "Nth Rune", "Piscine Quest 5", "NRune(value string, position int) rune",
+			"Return a rune by one-based position.", "A UTF-8 string and position.", "The selected rune, or 0 when the position is invalid.",
+			nil, stringPositionFields, "NRune(current.Payload.Value, current.Payload.Position)", `0`,
+			[]practiceCase{
+				runePositionCase("First", "hello", 1, 'h'),
+				runePositionCase("Middle", "?Ó?‡", 2, 'Ó'),
+				runePositionCase("Too high", "go", 3, 0),
+				runePositionCase("Zero", "go", 0, 0),
+			}),
+		piscineSpec(1039, "String Index", "Piscine Quest 5", "Index(value string, target string) int",
+			"Find the first byte index of a substring.", "A string and substring.", "The first index, 0 for an empty target, or -1 when absent.",
+			[]string{"len"}, targetStringFields, "Index(current.Payload.Value, current.Payload.Target)", `-1`,
+			[]practiceCase{
+				indexCase("Empty target", "hello", "", 0),
+				indexCase("Beginning", "hello", "he", 0),
+				indexCase("Middle", "hello", "ll", 2),
+				indexCase("Absent", "hello", "x", -1),
+				indexCase("Too long", "go", "gopher", -1),
+			}),
+		piscineSpec(1040, "Is Alphanumeric", "Piscine Quest 5", "IsAlpha(value string) bool",
+			"Validate that a string contains only ASCII letters and digits.", "One string.", "true for alphanumeric or empty input.",
+			nil, stringField, "IsAlpha(current.Payload.Value)", `false`,
+			boolStringCases([]string{"", "abcXYZ", "abc123", "hello world", "cafÇ"}, []bool{true, true, true, false, false})),
+		piscineSpec(1041, "Is Lowercase", "Piscine Quest 5", "IsLower(value string) bool",
+			"Validate that every character is an ASCII lowercase letter.", "One string.", "true for lowercase-only or empty input.",
+			nil, stringField, "IsLower(current.Payload.Value)", `false`,
+			boolStringCases([]string{"", "abc", "a1", "Abc", "Ç"}, []bool{true, true, false, false, false})),
+		piscineSpec(1042, "Is Numeric", "Piscine Quest 5", "IsNumeric(value string) bool",
+			"Validate that every character is an ASCII decimal digit.", "One string.", "true for digit-only or empty input.",
+			nil, stringField, "IsNumeric(current.Payload.Value)", `false`,
+			boolStringCases([]string{"", "0123", "-1", "1.0", "12"}, []bool{true, true, false, false, false})),
+		piscineSpec(1043, "Is Printable", "Piscine Quest 5", "IsPrintable(value string) bool",
+			"Validate that every rune is printable.", "One string.", "true when all runes are at least the space character.",
+			nil, stringField, "IsPrintable(current.Payload.Value)", `false`,
+			boolStringCases([]string{"", "hello", "a b", "line\nbreak", "\t"}, []bool{true, true, true, false, false})),
+		piscineSpec(1044, "Is Uppercase", "Piscine Quest 5", "IsUpper(value string) bool",
+			"Validate that every character is an ASCII uppercase letter.", "One string.", "true for uppercase-only or empty input.",
+			nil, stringField, "IsUpper(current.Payload.Value)", `false`,
+			boolStringCases([]string{"", "ABC", "A1", "AbC", "ê"}, []bool{true, true, false, false, false})),
+		piscineSpec(1045, "To Lower", "Piscine Quest 5", "ToLower(value string) string",
+			"Convert ASCII uppercase letters to lowercase.", "One string.", "The converted string with non-uppercase data unchanged.",
+			nil, stringField, "ToLower(current.Payload.Value)", `""`,
+			stringCases([]string{"", "HELLO", "Go 123!", "already"}, []string{"", "hello", "go 123!", "already"})),
+		piscineSpec(1046, "To Upper", "Piscine Quest 5", "ToUpper(value string) string",
+			"Convert ASCII lowercase letters to uppercase.", "One string.", "The converted string with non-lowercase data unchanged.",
+			nil, stringField, "ToUpper(current.Payload.Value)", `""`,
+			stringCases([]string{"", "hello", "Go 123!", "ALREADY"}, []string{"", "HELLO", "GO 123!", "ALREADY"})),
+		piscineSpec(1047, "Capitalize", "Piscine Quest 5", "Capitalize(value string) string",
+			"Uppercase each alphanumeric word's first character and lowercase the rest.", "One string.", "The transformed string; non-alphanumeric characters separate words.",
+			[]string{"len"}, stringField, "Capitalize(current.Payload.Value)", `""`,
+			stringCases(
+				[]string{"", "Hello! How are you?", "56street", "a-b_C", "GOlang"},
+				[]string{"", "Hello! How Are You?", "56street", "A-B_C", "Golang"},
+			)),
+		piscineSpec(1048, "Join", "Piscine Quest 5", "Join(values []string, separator string) string",
+			"Join strings with a separator between neighboring elements.", "A string slice and separator.", "The joined string with no leading or trailing separator.",
+			[]string{"len"}, stringsSeparatorFields, "Join(current.Payload.Values, current.Payload.Separator)", `""`,
+			[]practiceCase{
+				joinCase("Empty", []string{}, ",", ""),
+				joinCase("One", []string{"go"}, ",", "go"),
+				joinCase("Several", []string{"go", "lang"}, "-", "go-lang"),
+				joinCase("Empty separator", []string{"a", "b"}, "", "ab"),
+			}),
+		piscineSpec(1049, "Trim Atoi", "Piscine Quest 5", "TrimAtoi(value string) int",
+			"Extract all decimal digits from a string and apply an earlier minus sign.", "One string.", "The collected integer, negative only when - occurs before the first digit.",
+			nil, stringField, "TrimAtoi(current.Payload.Value)", `0`,
+			intStringCases(
+				[]string{"", "123", "abc-12def3", "a1-23", "--42", "no digits"},
+				[]int{0, 123, -123, 123, -42, 0},
+			)),
+		piscineSpec(1050, "Print Number In Order", "Piscine Quest 5", "PrintNbrInOrder(value int) string",
+			"Sort the decimal digits of a non-negative integer.", "One non-negative integer.", "Its digits in ascending order.",
+			nil, intField, "PrintNbrInOrder(current.Payload.Value)", `""`,
+			[]practiceCase{
+				intOutputCase("Zero", 0, "0"),
+				intOutputCase("Sorted", 1234, "1234"),
+				intOutputCase("Mixed", 3214, "1234"),
+				intOutputCase("Repeated", 90901, "00199"),
+			}),
+		piscineSpec(1051, "Print Number In Base", "Piscine Quest 5", "PrintNbrBase(value int, base string) string",
+			"Format an integer using a caller-provided digit alphabet.", "An integer and base alphabet.", "The representation, or \"NV\" when the base is invalid.",
+			[]string{"len"}, intBaseStringFields, "PrintNbrBase(current.Payload.Value, current.Payload.Base)", `""`,
+			[]practiceCase{
+				numberBaseCase("Binary", 10, "01", "1010"),
+				numberBaseCase("Hex", 255, "0123456789abcdef", "ff"),
+				numberBaseCase("Negative", -10, "01", "-1010"),
+				numberBaseCase("Short base", 10, "0", "NV"),
+				numberBaseCase("Duplicate digit", 10, "001", "NV"),
+			}),
+		piscineSpec(1052, "Alphabet Mirror", "Piscine Quest 5", "AlphaMirror(value string) string",
+			"Replace each ASCII letter with its opposite in the alphabet.", "One string.", "az, by, preserving case and other characters.",
+			nil, stringField, "AlphaMirror(current.Payload.Value)", `""`,
+			stringCases([]string{"", "abc", "XYZ", "Hello!", "azAZ"}, []string{"", "zyx", "CBA", "Svool!", "zaZA"})),
+		piscineSpec(1053, "ROT13", "Piscine Quest 5", "Rot13(value string) string",
+			"Rotate ASCII letters by 13 places.", "One string.", "The ROT13 transformation with case preserved.",
+			nil, stringField, "Rot13(current.Payload.Value)", `""`,
+			stringCases([]string{"", "abc", "Hello, World!", "uryyb"}, []string{"", "nop", "Uryyb, Jbeyq!", "hello"})),
+		piscineSpec(1054, "ROT14", "Piscine Quest 5", "Rot14(value string) string",
+			"Rotate ASCII letters by 14 places.", "One string.", "The ROT14 transformation with case preserved.",
+			nil, stringField, "Rot14(current.Payload.Value)", `""`,
+			stringCases([]string{"", "abc", "XYZ", "Hello!"}, []string{"", "opq", "LMN", "Vszzc!"})),
+		piscineSpec(1055, "Switch Case", "Piscine Quest 5", "SwitchCase(value string) string",
+			"Reverse the case of every ASCII letter.", "One string.", "Uppercase becomes lowercase and lowercase becomes uppercase.",
+			nil, stringField, "SwitchCase(current.Payload.Value)", `""`,
+			stringCases([]string{"", "Hello!", "ABC xyz", "123"}, []string{"", "hELLO!", "abc XYZ", "123"})),
+		piscineSpec(1056, "Pig Latin", "Piscine Quest 5", "PigLatin(value string) string",
+			"Transform one word using the piscine Pig Latin rules.", "One lowercase ASCII word.", "Append \"ay\" after an initial vowel; otherwise move the leading consonant cluster and append \"ay\".",
+			[]string{"len"}, stringField, "PigLatin(current.Payload.Value)", `""`,
+			stringCases([]string{"", "apple", "pig", "smile", "rhythm"}, []string{"", "appleay", "igpay", "ilesmay", "No vowels"})),
 	}
 }
 
