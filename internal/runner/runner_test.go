@@ -126,8 +126,58 @@ func TestEveryStarterCompilesWithItsHarness(t *testing.T) {
 	}
 }
 
+func TestFoundationalReferenceSolutionsPass(t *testing.T) {
+	solutions := map[int]string{
+		1:  `func Echo(value string) string { return value }`,
+		2:  `func Increment(value int) int { return value + 1 }`,
+		3:  `func IsPositive(value int) bool { return value > 0 }`,
+		4:  `func MaxInt(left, right int) int { if left > right { return left }; return right }`,
+		5:  `func Abs(value int) int { if value < 0 { return -value }; return value }`,
+		6:  `func Clamp(value, minimum, maximum int) int { if value < minimum { return minimum }; if value > maximum { return maximum }; return value }`,
+		7:  `func ByteCount(value string) int { return len(value) }`,
+		8:  `func FirstByte(value string) string { if len(value) == 0 { return "" }; return string(value[0]) }`,
+		9:  `func Repeat(value string, count int) string { result := ""; for i := 0; i < count; i++ { result += value }; return result }`,
+		10: `func Sum(values []int) int { total := 0; for _, value := range values { total += value }; return total }`,
+		11: `func CountValue(values []int, target int) int { count := 0; for _, value := range values { if value == target { count++ } }; return count }`,
+		12: `func Contains(values []int, target int) bool { for _, value := range values { if value == target { return true } }; return false }`,
+		13: `func Reverse(value string) string { result := ""; for i := len(value)-1; i >= 0; i-- { result += string(value[i]) }; return result }`,
+		14: `func IsPalindrome(value string) bool { for left, right := 0, len(value)-1; left < right; left, right = left+1, right-1 { if value[left] != value[right] { return false } }; return true }`,
+		15: `func FilterEven(values []int) []int { result := []int{}; for _, value := range values { if value%2 == 0 { result = append(result, value) } }; return result }`,
+		16: `func Minimum(values []int) int { if len(values) == 0 { return 0 }; result := values[0]; for _, value := range values[1:] { if value < result { result = value } }; return result }`,
+		17: `func UniqueStrings(values []string) []string { result := []string{}; seen := make(map[string]bool); for _, value := range values { if !seen[value] { seen[value] = true; result = append(result, value) } }; return result }`,
+		18: `func Lengths(values []string) []int { result := []int{}; for _, value := range values { result = append(result, len(value)) }; return result }`,
+		19: `func Frequencies(values []string) map[string]int { result := map[string]int{}; for _, value := range values { result[value]++ }; return result }`,
+		20: `func RotateLeft(values []int, steps int) []int { if len(values) == 0 { return []int{} }; steps %= len(values); result := []int{}; result = append(result, values[steps:]...); result = append(result, values[:steps]...); return result }`,
+		21: `func BalancedBrackets(value string) bool { stack := []byte{}; pairs := map[byte]byte{')':'(', ']':'[', '}':'{'}; for i := 0; i < len(value); i++ { char := value[i]; if char == '(' || char == '[' || char == '{' { stack = append(stack, char); continue }; if opening, closing := pairs[char]; closing { if len(stack) == 0 || stack[len(stack)-1] != opening { return false }; stack = stack[:len(stack)-1] } }; return len(stack) == 0 }`,
+	}
+	localRunner := New("go", 2, nil)
+	for levelID := 1; levelID <= len(solutions); levelID++ {
+		level, found := assessment.FindLevel(levelID)
+		if !found {
+			t.Fatalf("foundational exercise %d is missing", levelID)
+		}
+		result := localRunner.Run(
+			context.Background(),
+			level,
+			solutions[levelID],
+			nil,
+		)
+		if !result.Passed {
+			t.Fatalf(
+				"exercise %d reference failed (%d/%d): compile=%q runtime=%q results=%#v",
+				levelID,
+				result.PassedCount,
+				result.TotalCount,
+				result.CompileError,
+				result.RuntimeError,
+				result.Results,
+			)
+		}
+	}
+}
+
 func TestLocalRunnerEnforcesOutputLimit(t *testing.T) {
-	level, _ := assessment.FindLevel(1)
+	level, _ := assessment.FindLevel(22)
 	result := NewLocal("go", 1, nil).Run(
 		context.Background(),
 		level,
