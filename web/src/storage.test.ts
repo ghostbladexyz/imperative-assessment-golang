@@ -8,7 +8,7 @@ import {
 } from "./storage";
 import type { Level } from "./types";
 
-const levels = Array.from({ length: 30 }, (_, index) => ({
+const levels = Array.from({ length: 171 }, (_, index) => ({
   id: index + 1,
   title: `Level ${index + 1}`,
   tests: [{ id: "a" }],
@@ -28,7 +28,7 @@ describe("progress state", () => {
   it("practice mode unlocks every level", () => {
     const progress = createProgress(levels);
     progress.settings.practiceMode = true;
-    expect(isLevelUnlocked(30, progress)).toBe(true);
+    expect(isLevelUnlocked(171, progress)).toBe(true);
   });
 
   it("counts only the highest sequential completion", () => {
@@ -50,7 +50,7 @@ describe("progress state", () => {
 
   it("rejects a foreign schema", () => {
     expect(() => validateImport({ schemaVersion: 99 }, levels)).toThrow(
-      /schema version 2/,
+      /schema version 4/,
     );
   });
 });
