@@ -18,6 +18,8 @@ type Instructions struct {
 	Constraints     []string            `json:"constraints"`
 	Examples        []Example           `json:"examples"`
 	Documentation   []DocumentationLink `json:"documentation"`
+	AllowedBuiltins []string            `json:"allowedBuiltins"`
+	AllowedPackages []string            `json:"allowedPackages"`
 	Allowed         []string            `json:"allowed"`
 	Disallowed      []string            `json:"disallowed"`
 	StarterNote     string              `json:"starterNote"`
