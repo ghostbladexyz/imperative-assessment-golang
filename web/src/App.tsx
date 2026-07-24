@@ -26,7 +26,7 @@ import {
   Terminal,
 } from "lucide-react";
 import {
-  fetchLevels,
+  fetchCatalogue,
   formatCode,
   runTests,
   validateReceipts,
@@ -71,24 +71,25 @@ function App() {
 
   useEffect(() => {
     let cancelled = false;
-    void fetchLevels()
-      .then(async (loadedLevels) => {
+    void fetchCatalogue()
+      .then(async (catalogue) => {
         if (cancelled) return;
-        const loaded = loadProgress(loadedLevels);
+        const loadedLevels = catalogue.levels;
+        const loaded = loadProgress(catalogue);
         const receipts = Object.fromEntries(
-          Object.entries(loaded.levels)
+          Object.entries(loaded.exercises)
             .filter(([, item]) => Boolean(item.receipt))
-            .map(([id, item]) => [id, item.receipt!]),
+            .map(([key, item]) => [key, item.receipt!]),
         );
         try {
           const valid = new Set(await validateReceipts(receipts));
-          for (const [id, item] of Object.entries(loaded.levels)) {
-            item.passed = Boolean(item.receipt) && valid.has(Number(id));
+          for (const [key, item] of Object.entries(loaded.exercises)) {
+            item.passed = Boolean(item.receipt) && valid.has(key);
           }
         } catch {
-          for (const item of Object.values(loaded.levels)) item.passed = false;
+          for (const item of Object.values(loaded.exercises)) item.passed = false;
         }
-        for (const item of Object.values(loaded.levels)) {
+        for (const item of Object.values(loaded.exercises)) {
           item.code = ensurePackageDeclaration(item.code);
         }
         setLevels(loadedLevels);
@@ -136,12 +137,12 @@ function App() {
 
   const level = useMemo(
     () =>
-      levels.find((item) => item.id === progress?.currentLevelId) ?? levels[0],
-    [levels, progress?.currentLevelId],
+      levels.find((item) => item.key === progress?.currentExerciseKey) ?? levels[0],
+    [levels, progress?.currentExerciseKey],
   );
   const levelProgress =
-    progress && level ? progress.levels[String(level.id)] : undefined;
-  const result = level ? runs[String(level.id)] : undefined;
+    progress && level ? progress.exercises[level.key] : undefined;
+  const result = level ? runs[level.key] : undefined;
 
   const updateCode = useCallback(
     (code: string) => {
@@ -154,17 +155,17 @@ function App() {
       setEditRevision((value) => value + 1);
       setRuns((current) => {
         const next = { ...current };
-        delete next[String(level.id)];
+        delete next[level.key];
         return next;
       });
       setProgress((current) => {
         if (!current) return current;
-        const key = String(level.id);
+        const key = level.key;
         return {
           ...current,
-          levels: {
-            ...current.levels,
-            [key]: { ...current.levels[key], code },
+          exercises: {
+            ...current.exercises,
+            [key]: { ...current.exercises[key], code },
           },
         };
       });
@@ -183,7 +184,7 @@ function App() {
 
     try {
       const nextResult = await runTests(
-        level.id,
+        level.key,
         levelProgress.code,
         [],
         controller.signal,
@@ -191,16 +192,16 @@ function App() {
       if (version !== runVersionRef.current) return;
       setRuns((current) => ({
         ...current,
-        [String(level.id)]: nextResult,
+        [level.key]: nextResult,
       }));
       setProgress((current) => {
         if (!current) return current;
-        const key = String(level.id);
-        const item = current.levels[key];
+        const key = level.key;
+        const item = current.exercises[key];
         return {
           ...current,
-          levels: {
-            ...current.levels,
+          exercises: {
+            ...current.exercises,
             [key]: {
               ...item,
               code: item.code,
@@ -230,7 +231,7 @@ function App() {
         error instanceof Error ? error.message : "The test run failed.";
       setRuns((current) => ({
         ...current,
-        [String(level.id)]: failedRun(level.id, level.tests.length, message),
+        [level.key]: failedRun(level.key, level.id, level.tests.length, message),
       }));
     } finally {
       if (version === runVersionRef.current) {
@@ -295,7 +296,9 @@ function App() {
 
   const selectLevel = (id: number) => {
     if (!progress || id < 1 || id > levels.length) return;
-    setProgress({ ...progress, currentLevelId: id });
+    const selected = levels.find((item) => item.id === id);
+    if (!selected) return;
+    setProgress({ ...progress, currentExerciseKey: selected.key });
     setEditRevision(0);
     lastAutoRevisionRef.current = 0;
   };
@@ -315,7 +318,7 @@ function App() {
         error instanceof Error ? error.message : "gofmt could not format code.";
       setRuns((current) => ({
         ...current,
-        [String(level.id)]: failedRun(level.id, level.tests.length, message),
+        [level.key]: failedRun(level.key, level.id, level.tests.length, message),
       }));
     }
   };
@@ -349,7 +352,8 @@ function App() {
     } catch {
       setRuns((current) => ({
         ...current,
-        [String(level.id)]: failedRun(
+        [level.key]: failedRun(
+          level.key,
           level.id,
           level.tests.length,
           "This browser did not allow fullscreen mode.",
@@ -910,8 +914,14 @@ function outcomeFor(result: RunResult): string {
   return `${result.passedCount}/${result.totalCount} tests passed`;
 }
 
-function failedRun(levelId: number, totalCount: number, message: string): RunResult {
+function failedRun(
+  exerciseKey: string,
+  levelId: number,
+  totalCount: number,
+  message: string,
+): RunResult {
   return {
+    exerciseKey,
     levelId,
     passed: false,
     passedCount: 0,

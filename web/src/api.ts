@@ -1,4 +1,9 @@
-import type { Level, RunnerConfig, RunResult } from "./types";
+import type {
+  Catalogue,
+  ExerciseKey,
+  RunnerConfig,
+  RunResult,
+} from "./types";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -15,9 +20,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return data;
 }
 
-export async function fetchLevels(): Promise<Level[]> {
-  const response = await request<{ levels: Level[] }>("/api/levels");
-  return response.levels;
+export async function fetchCatalogue(): Promise<Catalogue> {
+  return request<Catalogue>("/api/levels");
 }
 
 export async function fetchRunnerConfig(): Promise<RunnerConfig> {
@@ -25,14 +29,14 @@ export async function fetchRunnerConfig(): Promise<RunnerConfig> {
 }
 
 export async function runTests(
-  levelId: number,
+  exerciseKey: ExerciseKey,
   code: string,
   testIds: string[],
   signal: AbortSignal,
 ): Promise<RunResult> {
   return request<RunResult>("/api/run", {
     method: "POST",
-    body: JSON.stringify({ levelId, code, testIds }),
+    body: JSON.stringify({ exerciseKey, code, testIds }),
     signal,
   });
 }
@@ -46,14 +50,14 @@ export async function formatCode(code: string): Promise<string> {
 }
 
 export async function validateReceipts(
-  receipts: Record<string, string>,
-): Promise<number[]> {
-  const response = await request<{ validLevelIds: number[] }>(
+  receipts: Record<ExerciseKey, string>,
+): Promise<ExerciseKey[]> {
+  const response = await request<{ validExerciseKeys: ExerciseKey[] }>(
     "/api/receipts/validate",
     {
       method: "POST",
       body: JSON.stringify({ receipts }),
     },
   );
-  return response.validLevelIds;
+  return response.validExerciseKeys;
 }

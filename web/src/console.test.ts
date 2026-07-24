@@ -14,6 +14,7 @@ const tests: Level["tests"] = [
 
 function run(overrides: Partial<RunResult>): RunResult {
   return {
+    exerciseKey: "foundation/1",
     levelId: 1,
     passed: false,
     passedCount: 0,

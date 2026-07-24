@@ -1,5 +1,6 @@
 export type Theme = "light" | "dark";
 export type RunnerMode = "docker" | "local";
+export type ExerciseKey = string;
 
 export interface RunnerConfig {
   ok: boolean;
@@ -47,6 +48,7 @@ export interface VisibleTest {
 }
 
 export interface Level {
+  key: ExerciseKey;
   id: number;
   title: string;
   topic: string;
@@ -56,6 +58,15 @@ export interface Level {
   starterCode: string;
   instructions: Instructions;
   tests: VisibleTest[];
+}
+
+export interface Catalogue {
+  levels: Level[];
+  progressSchemaVersion: number;
+  legacyProgress: {
+    schemaVersion: 4;
+    exerciseKeys: ExerciseKey[];
+  };
 }
 
 export type ResultStatus =
@@ -74,6 +85,7 @@ export interface TestResult extends VisibleTest {
 }
 
 export interface RunResult {
+  exerciseKey: ExerciseKey;
   levelId: number;
   passed: boolean;
   passedCount: number;
@@ -101,7 +113,7 @@ export interface HistoryEntry {
   outcome: string;
 }
 
-export interface LevelProgress {
+export interface ExerciseProgress {
   code: string;
   receipt?: string;
   passed: boolean;
@@ -129,10 +141,10 @@ export interface Settings {
 }
 
 export interface SavedProgress {
-  schemaVersion: 4;
+  schemaVersion: number;
   updatedAt: number;
-  currentLevelId: number;
-  levels: Record<string, LevelProgress>;
+  currentExerciseKey: ExerciseKey;
+  exercises: Record<ExerciseKey, ExerciseProgress>;
   timer: TimerState;
   settings: Settings;
 }

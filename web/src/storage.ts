@@ -1,12 +1,15 @@
 import type {
+  Catalogue,
+  ExerciseKey,
+  ExerciseProgress,
   Level,
-  LevelProgress,
   SavedProgress,
   Settings,
   TimerState,
 } from "./types";
 
-export const STORAGE_KEY = "imperative-go-assessment:progress:v4";
+export const STORAGE_KEY = "imperative-go-assessment:progress";
+export const LEGACY_STORAGE_KEY = "imperative-go-assessment:progress:v4";
 export const ASSESSMENT_SECONDS = 6 * 60 * 60;
 
 export const defaultSettings = (): Settings => ({
@@ -30,7 +33,7 @@ export const defaultTimer = (): TimerState => ({
   lastTickAt: Date.now(),
 });
 
-export function makeLevelProgress(level: Level): LevelProgress {
+export function makeExerciseProgress(level: Level): ExerciseProgress {
   return {
     code: level.starterCode,
     passed: false,
@@ -43,13 +46,15 @@ export function makeLevelProgress(level: Level): LevelProgress {
   };
 }
 
-export function createProgress(levels: Level[]): SavedProgress {
+export function createProgress(catalogue: Catalogue): SavedProgress {
+  const first = catalogue.levels[0];
+  if (!first) throw new Error("The catalogue contains no exercises.");
   return {
-    schemaVersion: 4,
+    schemaVersion: catalogue.progressSchemaVersion,
     updatedAt: Date.now(),
-    currentLevelId: 1,
-    levels: Object.fromEntries(
-      levels.map((level) => [String(level.id), makeLevelProgress(level)]),
+    currentExerciseKey: first.key,
+    exercises: Object.fromEntries(
+      catalogue.levels.map((level) => [level.key, makeExerciseProgress(level)]),
     ),
     timer: defaultTimer(),
     settings: defaultSettings(),
@@ -60,28 +65,91 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-export function validateImport(value: unknown, levels: Level[]): SavedProgress {
-  if (!isRecord(value) || value.schemaVersion !== 4) {
-    throw new Error("This backup does not use progress schema version 4.");
+export function validateImport(
+  value: unknown,
+  catalogue: Catalogue,
+): SavedProgress {
+  if (!isRecord(value)) {
+    throw new Error("The backup is not a progress record.");
   }
-  if (
-    typeof value.currentLevelId !== "number" ||
-    value.currentLevelId < 1 ||
-    value.currentLevelId > levels.length ||
-    !isRecord(value.levels) ||
-    !isRecord(value.timer) ||
-    !isRecord(value.settings)
-  ) {
+  if (value.schemaVersion === catalogue.progressSchemaVersion) {
+    return reconcileCurrent(value, catalogue);
+  }
+  if (value.schemaVersion === catalogue.legacyProgress.schemaVersion) {
+    return migrateLegacyProgress(value, catalogue);
+  }
+  throw new Error(
+    `This backup does not use progress schema version ${catalogue.progressSchemaVersion} or ${catalogue.legacyProgress.schemaVersion}.`,
+  );
+}
+
+function reconcileCurrent(
+  value: Record<string, unknown>,
+  catalogue: Catalogue,
+): SavedProgress {
+  if (!isRecord(value.exercises) || !isRecord(value.timer) || !isRecord(value.settings)) {
     throw new Error("The backup is missing required assessment fields.");
   }
-  const clean = createProgress(levels);
-  clean.currentLevelId = value.currentLevelId;
+  const clean = createProgress(catalogue);
+  const requestedKey =
+    typeof value.currentExerciseKey === "string"
+      ? value.currentExerciseKey
+      : clean.currentExerciseKey;
+  clean.currentExerciseKey = catalogue.levels.some(
+    (level) => level.key === requestedKey,
+  )
+    ? requestedKey
+    : clean.currentExerciseKey;
+  reconcileExercises(clean, value.exercises, catalogue.levels, (level) => level.key);
+  reconcileSharedState(clean, value);
+  return clean;
+}
+
+function migrateLegacyProgress(
+  value: Record<string, unknown>,
+  catalogue: Catalogue,
+): SavedProgress {
+  if (!isRecord(value.levels) || !isRecord(value.timer) || !isRecord(value.settings)) {
+    throw new Error("The schema-v4 backup is missing required assessment fields.");
+  }
+  const clean = createProgress(catalogue);
+  const legacyPosition =
+    typeof value.currentLevelId === "number" &&
+    Number.isInteger(value.currentLevelId)
+      ? value.currentLevelId
+      : 1;
+  const requestedKey = catalogue.legacyProgress.exerciseKeys[legacyPosition - 1];
+  if (
+    requestedKey &&
+    catalogue.levels.some((level) => level.key === requestedKey)
+  ) {
+    clean.currentExerciseKey = requestedKey;
+  }
+  const legacyPositionByKey = new Map(
+    catalogue.legacyProgress.exerciseKeys.map((key, index) => [key, index + 1]),
+  );
+  reconcileExercises(clean, value.levels, catalogue.levels, (level) => {
+    const position = legacyPositionByKey.get(level.key);
+    return position === undefined ? undefined : String(position);
+  });
+  reconcileSharedState(clean, value);
+  return clean;
+}
+
+function reconcileExercises(
+  clean: SavedProgress,
+  candidates: Record<string, unknown>,
+  levels: Level[],
+  candidateKey: (level: Level) => string | undefined,
+): void {
   for (const level of levels) {
-    const candidate = value.levels[String(level.id)];
+    const key = candidateKey(level);
+    const candidate = key === undefined ? undefined : candidates[key];
+    if (candidate === undefined) continue;
     if (!isRecord(candidate) || typeof candidate.code !== "string") {
-      throw new Error(`The backup has invalid data for level ${level.id}.`);
+      throw new Error(`The backup has invalid data for exercise ${level.key}.`);
     }
-    const target = clean.levels[String(level.id)];
+    const target = clean.exercises[level.key];
     target.code = candidate.code.slice(0, 192 * 1024);
     target.receipt =
       typeof candidate.receipt === "string" ? candidate.receipt : undefined;
@@ -118,28 +186,35 @@ export function validateImport(value: unknown, levels: Level[]): SavedProgress {
           .slice(0, 10)
       : [];
   }
+}
+
+function reconcileSharedState(
+  clean: SavedProgress,
+  value: Record<string, unknown>,
+): void {
+  const timer = value.timer as Record<string, unknown>;
   clean.timer = {
     durationSeconds: ASSESSMENT_SECONDS,
     elapsedSeconds: Math.min(
       ASSESSMENT_SECONDS,
-      finiteNonNegative(value.timer.elapsedSeconds),
+      finiteNonNegative(timer.elapsedSeconds),
     ),
-    running: value.timer.running === true,
+    running: timer.running === true,
     lastTickAt: Date.now(),
   };
+  const settings = value.settings as Record<string, unknown>;
   const defaults = defaultSettings();
   clean.settings = {
-    theme: value.settings.theme === "dark" ? "dark" : "light",
-    practiceMode: value.settings.practiceMode === true,
-    autoTest: value.settings.autoTest === true,
+    theme: settings.theme === "dark" ? "dark" : "light",
+    practiceMode: settings.practiceMode === true,
+    autoTest: settings.autoTest === true,
     fontSize: Math.min(
       22,
-      Math.max(12, finiteNonNegative(value.settings.fontSize) || defaults.fontSize),
+      Math.max(12, finiteNonNegative(settings.fontSize) || defaults.fontSize),
     ),
-    reducedMotion: value.settings.reducedMotion === true,
+    reducedMotion: settings.reducedMotion === true,
   };
   clean.updatedAt = Date.now();
-  return clean;
 }
 
 function finiteNonNegative(value: unknown): number {
@@ -148,13 +223,16 @@ function finiteNonNegative(value: unknown): number {
     : 0;
 }
 
-export function loadProgress(levels: Level[]): SavedProgress {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? validateImport(JSON.parse(raw), levels) : createProgress(levels);
-  } catch {
-    return createProgress(levels);
+export function loadProgress(catalogue: Catalogue): SavedProgress {
+  for (const key of [STORAGE_KEY, LEGACY_STORAGE_KEY]) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) return validateImport(JSON.parse(raw), catalogue);
+    } catch {
+      // Try the older store before falling back to clean progress.
+    }
   }
+  return createProgress(catalogue);
 }
 
 export function saveProgress(progress: SavedProgress): void {
@@ -162,6 +240,7 @@ export function saveProgress(progress: SavedProgress): void {
     STORAGE_KEY,
     JSON.stringify({ ...progress, updatedAt: Date.now() }),
   );
+  localStorage.removeItem(LEGACY_STORAGE_KEY);
 }
 
 export function settleTimer(timer: TimerState, now = Date.now()): TimerState {
@@ -181,22 +260,24 @@ export function settleTimer(timer: TimerState, now = Date.now()): TimerState {
   };
 }
 
-export function sequentialCompleted(progress: SavedProgress): number {
+export function sequentialCompleted(
+  levels: Level[],
+  progress: SavedProgress,
+): number {
   let completed = 0;
-  for (let levelId = 1; levelId <= Object.keys(progress.levels).length; levelId += 1) {
-    if (!progress.levels[String(levelId)]?.passed) break;
-    completed = levelId;
+  for (const level of levels) {
+    if (!progress.exercises[level.key]?.passed) break;
+    completed = level.id;
   }
   return completed;
 }
 
 export function isLevelUnlocked(
-  levelId: number,
+  exerciseKey: ExerciseKey,
+  levels: Level[],
   progress: SavedProgress,
 ): boolean {
-  return (
-    progress.settings.practiceMode ||
-    levelId === 1 ||
-    progress.levels[String(levelId - 1)]?.passed === true
-  );
+  if (progress.settings.practiceMode) return true;
+  const index = levels.findIndex((level) => level.key === exerciseKey);
+  return index === 0 || progress.exercises[levels[index - 1]?.key]?.passed === true;
 }

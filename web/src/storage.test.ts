@@ -6,36 +6,46 @@ import {
   settleTimer,
   validateImport,
 } from "./storage";
-import type { Level } from "./types";
+import type { Catalogue, Level } from "./types";
 
 const levels = Array.from({ length: 171 }, (_, index) => ({
+  key: index < 21 ? `foundation/${index + 1}` : `piscine/${index + 980}`,
   id: index + 1,
-  title: `Level ${index + 1}`,
+  title: `Exercise ${index + 1}`,
   tests: [{ id: "a" }],
   starterCode: "func solve() {}",
   instructions: { hints: [] },
 })) as unknown as Level[];
 
+const catalogue: Catalogue = {
+  levels,
+  progressSchemaVersion: 5,
+  legacyProgress: {
+    schemaVersion: 4,
+    exerciseKeys: levels.map((level) => level.key),
+  },
+};
+
 describe("progress state", () => {
-  it("unlocks levels sequentially", () => {
-    const progress = createProgress(levels);
-    expect(isLevelUnlocked(1, progress)).toBe(true);
-    expect(isLevelUnlocked(2, progress)).toBe(false);
-    progress.levels["1"].passed = true;
-    expect(isLevelUnlocked(2, progress)).toBe(true);
+  it("unlocks exercises sequentially by Exercise Key", () => {
+    const progress = createProgress(catalogue);
+    expect(isLevelUnlocked(levels[0].key, levels, progress)).toBe(true);
+    expect(isLevelUnlocked(levels[1].key, levels, progress)).toBe(false);
+    progress.exercises[levels[0].key].passed = true;
+    expect(isLevelUnlocked(levels[1].key, levels, progress)).toBe(true);
   });
 
-  it("practice mode unlocks every level", () => {
-    const progress = createProgress(levels);
+  it("practice mode unlocks every exercise", () => {
+    const progress = createProgress(catalogue);
     progress.settings.practiceMode = true;
-    expect(isLevelUnlocked(171, progress)).toBe(true);
+    expect(isLevelUnlocked(levels[170].key, levels, progress)).toBe(true);
   });
 
   it("counts only the highest sequential completion", () => {
-    const progress = createProgress(levels);
-    progress.levels["1"].passed = true;
-    progress.levels["3"].passed = true;
-    expect(sequentialCompleted(progress)).toBe(1);
+    const progress = createProgress(catalogue);
+    progress.exercises[levels[0].key].passed = true;
+    progress.exercises[levels[2].key].passed = true;
+    expect(sequentialCompleted(levels, progress)).toBe(1);
   });
 
   it("settles a persisted running timer", () => {
@@ -48,9 +58,58 @@ describe("progress state", () => {
     expect(settleTimer(timer, 6000).elapsedSeconds).toBe(15);
   });
 
+  it("migrates schema-v4 positions through the frozen key map", () => {
+    const legacy = {
+      schemaVersion: 4,
+      currentLevelId: 2,
+      levels: {
+        "1": { ...createProgress(catalogue).exercises[levels[0].key], code: "first" },
+        "2": { ...createProgress(catalogue).exercises[levels[1].key], code: "second" },
+      },
+      timer: { elapsedSeconds: 12, running: true },
+      settings: { theme: "dark" },
+    };
+    const reordered = {
+      ...catalogue,
+      levels: [levels[1], levels[0], ...levels.slice(2)].map((level, index) => ({
+        ...level,
+        id: index + 1,
+      })),
+    };
+
+    const migrated = validateImport(legacy, reordered);
+
+    expect(migrated.currentExerciseKey).toBe(levels[1].key);
+    expect(migrated.exercises[levels[0].key].code).toBe("first");
+    expect(migrated.exercises[levels[1].key].code).toBe("second");
+    expect(migrated.schemaVersion).toBe(5);
+  });
+
+  it("reconciles removed and newly added Exercise Keys", () => {
+    const saved = createProgress(catalogue);
+    saved.exercises[levels[0].key].code = "preserved";
+    saved.exercises["removed/999"] = saved.exercises[levels[0].key];
+    const added = {
+      ...levels[0],
+      key: "foundation/172",
+      id: levels.length + 1,
+      starterCode: "func Added() {}",
+    };
+    const changedCatalogue = {
+      ...catalogue,
+      levels: [...levels, added],
+    };
+
+    const reconciled = validateImport(saved, changedCatalogue);
+
+    expect(reconciled.exercises[levels[0].key].code).toBe("preserved");
+    expect(reconciled.exercises["removed/999"]).toBeUndefined();
+    expect(reconciled.exercises[added.key].code).toBe(added.starterCode);
+  });
+
   it("rejects a foreign schema", () => {
-    expect(() => validateImport({ schemaVersion: 99 }, levels)).toThrow(
-      /schema version 4/,
+    expect(() => validateImport({ schemaVersion: 99 }, catalogue)).toThrow(
+      /schema version 5 or 4/,
     );
   });
 });

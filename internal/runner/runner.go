@@ -68,22 +68,23 @@ type TestResult struct {
 }
 
 type RunResult struct {
-	LevelID       int          `json:"levelId"`
-	Passed        bool         `json:"passed"`
-	PassedCount   int          `json:"passedCount"`
-	TotalCount    int          `json:"totalCount"`
-	CompileError  string       `json:"compileError,omitempty"`
-	RuntimeError  string       `json:"runtimeError,omitempty"`
-	FailureKind   string       `json:"failureKind,omitempty"`
-	TimedOut      bool         `json:"timedOut"`
-	Stopped       bool         `json:"stopped"`
-	Stdout        string       `json:"stdout"`
-	Stderr        string       `json:"stderr"`
-	DurationMS    float64      `json:"durationMs"`
-	Results       []TestResult `json:"results"`
-	FormattedCode string       `json:"formattedCode,omitempty"`
-	SourceHash    string       `json:"sourceHash"`
-	Receipt       string       `json:"receipt,omitempty"`
+	ExerciseKey   assessment.ExerciseKey `json:"exerciseKey"`
+	LevelID       int                    `json:"levelId"`
+	Passed        bool                   `json:"passed"`
+	PassedCount   int                    `json:"passedCount"`
+	TotalCount    int                    `json:"totalCount"`
+	CompileError  string                 `json:"compileError,omitempty"`
+	RuntimeError  string                 `json:"runtimeError,omitempty"`
+	FailureKind   string                 `json:"failureKind,omitempty"`
+	TimedOut      bool                   `json:"timedOut"`
+	Stopped       bool                   `json:"stopped"`
+	Stdout        string                 `json:"stdout"`
+	Stderr        string                 `json:"stderr"`
+	DurationMS    float64                `json:"durationMs"`
+	Results       []TestResult           `json:"results"`
+	FormattedCode string                 `json:"formattedCode,omitempty"`
+	SourceHash    string                 `json:"sourceHash"`
+	Receipt       string                 `json:"receipt,omitempty"`
 }
 
 type Info struct {
@@ -101,7 +102,7 @@ type Service interface {
 }
 
 type ReceiptIssuer interface {
-	Issue(int, string) (string, error)
+	Issue(assessment.ExerciseKey, string) (string, error)
 }
 
 type executionPlan struct {
@@ -251,7 +252,7 @@ func (engine *Engine) complete(
 		!result.TimedOut &&
 		!result.Stopped
 	if result.Passed && engine.receipts != nil {
-		result.Receipt, _ = engine.receipts.Issue(plan.level.ID, result.SourceHash)
+		result.Receipt, _ = engine.receipts.Issue(plan.level.Key, result.SourceHash)
 	}
 	result.DurationMS = elapsedMS(started)
 	return result
@@ -280,7 +281,7 @@ func sourceHash(prepared string) string {
 }
 
 func prepareRun(level assessment.Level, source string, testIDs []string, started time.Time) (RunResult, executionPlan, bool) {
-	result := RunResult{LevelID: level.ID}
+	result := RunResult{ExerciseKey: level.Key, LevelID: level.ID}
 	if len(source) > MaxSourceBytes {
 		result.CompileError = fmt.Sprintf("Source is too large. The limit is %d KiB.", MaxSourceBytes/1024)
 		result.DurationMS = elapsedMS(started)

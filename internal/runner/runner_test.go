@@ -11,7 +11,7 @@ import (
 
 type testIssuer struct{}
 
-func (testIssuer) Issue(_ int, _ string) (string, error) {
+func (testIssuer) Issue(_ assessment.ExerciseKey, _ string) (string, error) {
 	return "verified-receipt", nil
 }
 
@@ -44,7 +44,7 @@ func TestEngineOwnsPreparationVerdictsAndCompletion(t *testing.T) {
 		"func CountAlpha(input string) int { return 0 }",
 		nil,
 	)
-	if !result.Passed || result.Receipt == "" {
+	if !result.Passed || result.Receipt == "" || result.ExerciseKey != level.Key {
 		t.Fatalf("engine did not complete the passing run: %#v", result)
 	}
 	if adapter.plan.harness == "" || adapter.plan.sourceHash == "" {

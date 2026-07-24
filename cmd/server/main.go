@@ -16,7 +16,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -29,6 +28,7 @@ import (
 
 const maxRequestBytes = runner.MaxSourceBytes + 32*1024
 const defaultRunnerMode = "docker"
+const progressSchemaVersion = 5
 
 type api struct {
 	runner   runner.Service
@@ -36,9 +36,9 @@ type api struct {
 }
 
 type runRequest struct {
-	LevelID int      `json:"levelId"`
-	Code    string   `json:"code"`
-	TestIDs []string `json:"testIds"`
+	ExerciseKey assessment.ExerciseKey `json:"exerciseKey"`
+	Code        string                 `json:"code"`
+	TestIDs     []string               `json:"testIds"`
 }
 
 type formatRequest struct {
@@ -150,7 +150,14 @@ func routes(api *api) (http.Handler, error) {
 		writeJSON(writer, http.StatusOK, health)
 	})
 	mux.HandleFunc("GET /api/levels", func(writer http.ResponseWriter, _ *http.Request) {
-		writeJSON(writer, http.StatusOK, map[string]any{"levels": assessment.PublicLevels(), "schemaVersion": 4})
+		writeJSON(writer, http.StatusOK, map[string]any{
+			"levels":                assessment.PublicLevels(),
+			"progressSchemaVersion": progressSchemaVersion,
+			"legacyProgress": map[string]any{
+				"schemaVersion": 4,
+				"exerciseKeys":  assessment.LegacyExerciseKeys(),
+			},
+		})
 	})
 	mux.HandleFunc("POST /api/run", api.run)
 	mux.HandleFunc("POST /api/format", api.format)
@@ -184,9 +191,9 @@ func (api *api) run(writer http.ResponseWriter, request *http.Request) {
 	if err := decodeJSON(writer, request, &input); err != nil {
 		return
 	}
-	level, found := assessment.FindLevel(input.LevelID)
+	level, found := assessment.FindExercise(input.ExerciseKey)
 	if !found {
-		writeJSON(writer, http.StatusBadRequest, map[string]string{"error": "unknown level"})
+		writeJSON(writer, http.StatusBadRequest, map[string]string{"error": "unknown exercise"})
 		return
 	}
 	writeJSON(writer, http.StatusOK, api.runner.Run(request.Context(), level, input.Code, input.TestIDs))
@@ -212,15 +219,25 @@ func (api *api) validateReceipts(writer http.ResponseWriter, request *http.Reque
 	if err := decodeJSON(writer, request, &input); err != nil {
 		return
 	}
-	valid := make([]int, 0, len(input.Receipts))
-	for levelText, encoded := range input.Receipts {
-		levelID, err := strconv.Atoi(levelText)
+	valid := make([]assessment.ExerciseKey, 0, len(input.Receipts))
+	for keyText, encoded := range input.Receipts {
+		key := assessment.ExerciseKey(keyText)
+		if _, found := assessment.FindExercise(key); !found {
+			continue
+		}
 		receipt, ok := api.receipts.Validate(encoded)
-		if err == nil && ok && receipt.LevelID == levelID {
-			valid = append(valid, levelID)
+		if !ok {
+			continue
+		}
+		if receipt.ExerciseKey == key {
+			valid = append(valid, key)
+			continue
+		}
+		if legacyKey, found := assessment.LegacyExerciseKey(receipt.LevelID); found && legacyKey == key {
+			valid = append(valid, key)
 		}
 	}
-	writeJSON(writer, http.StatusOK, map[string]any{"validLevelIds": valid})
+	writeJSON(writer, http.StatusOK, map[string]any{"validExerciseKeys": valid})
 }
 
 func decodeJSON(writer http.ResponseWriter, request *http.Request, destination any) error {
