@@ -1404,26 +1404,88 @@ function ResultsPanel({
           />
         ))}
       </div>
-      {result && (result.stdout || result.stderr) && (
-        <details className="process-output" open={showAll}>
-          <summary>
-            Program output <ChevronDown />
-          </summary>
-          {result.stdout && (
-            <>
-              <span>stdout</span>
-              <pre>{result.stdout}</pre>
-            </>
-          )}
-          {result.stderr && (
-            <>
-              <span>stderr</span>
-              <pre>{result.stderr}</pre>
-            </>
-          )}
-        </details>
-      )}
     </div>
+  );
+}
+
+function ConsolePanel({
+  result,
+  running,
+}: {
+  result?: RunResult;
+  running: boolean;
+}) {
+  const hasOutput = Boolean(
+    result?.compileError ||
+      result?.runtimeError ||
+      result?.stdout ||
+      result?.stderr,
+  );
+  return (
+    <details className="console-panel" open={running || hasOutput}>
+      <summary>
+        <span>
+          <Terminal /> Console
+        </span>
+        <small>
+          {running
+            ? "Running…"
+            : result?.compileError
+              ? "Compilation failed"
+              : hasOutput
+                ? "Output available"
+                : "No output"}
+        </small>
+        <ChevronDown />
+      </summary>
+      <div className="console-body" aria-live="polite">
+        {!result && !running && (
+          <p>
+            Run the tests to see compiler diagnostics and output from{" "}
+            <code>fmt.Println</code>, <code>print</code>, or <code>println</code>.
+          </p>
+        )}
+        {running && <p>Waiting for the Go runner…</p>}
+        {result?.compileError && (
+          <ConsoleStream label="compiler" tone="error">
+            {result.compileError}
+          </ConsoleStream>
+        )}
+        {result?.runtimeError && (
+          <ConsoleStream label="runtime" tone="error">
+            {result.runtimeError}
+          </ConsoleStream>
+        )}
+        {result?.stdout && (
+          <ConsoleStream label="stdout">{result.stdout}</ConsoleStream>
+        )}
+        {result?.stderr && !result.compileError && (
+          <ConsoleStream label="stderr" tone="error">
+            {result.stderr}
+          </ConsoleStream>
+        )}
+        {result && !hasOutput && (
+          <p>The program completed without writing to stdout or stderr.</p>
+        )}
+      </div>
+    </details>
+  );
+}
+
+function ConsoleStream({
+  label,
+  tone = "",
+  children,
+}: {
+  label: string;
+  tone?: "error" | "";
+  children: string;
+}) {
+  return (
+    <section className={`console-stream ${tone}`}>
+      <span>{label}</span>
+      <pre>{children}</pre>
+    </section>
   );
 }
 
