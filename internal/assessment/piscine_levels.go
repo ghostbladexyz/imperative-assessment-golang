@@ -9,11 +9,12 @@ import (
 // Duplicate solution variants and exercises already represented elsewhere in
 // the curriculum are intentionally omitted.
 func piscineLevels() []Level {
-	specs := make([]practiceSpec, 0, 75)
+	specs := make([]practiceSpec, 0, 90)
 specs = append(specs, piscineQuestTwoSpecs()...)
 specs = append(specs, piscineQuestThreeAndFourSpecs()...)
 specs = append(specs, piscineQuestFiveSpecs()...)
 specs = append(specs, piscineQuestSixAndSevenSpecs()...)
+specs = append(specs, piscineQuestEightAndNineSpecs()...)
 
 	levels := make([]Level, 0, len(specs))
 	for _, spec := range specs {
@@ -530,6 +531,131 @@ func piscineQuestSixAndSevenSpecs() []practiceSpec {
 				stringChunksCase("Remainder", "abcde", 2, []string{"ab", "cd", "e"}),
 				stringChunksCase("Large", "go", 5, []string{"go"}),
 				stringChunksNilCase("Invalid", "go", 0),
+			}),
+	}
+}
+
+func piscineQuestEightAndNineSpecs() []practiceSpec {
+	return []practiceSpec{
+		piscineSpec(1076, "Is Even", "Piscine Quest 8", "IsEven(value int) bool",
+			"Determine whether an integer is divisible by two.", "One integer.", "true for even values, including zero and negative values.",
+			nil, intField, "IsEven(current.Payload.Value)", `false`,
+			[]practiceCase{intBoolCase("Zero", 0, true), intBoolCase("Odd", 3, false), intBoolCase("Negative even", -4, true)}),
+		piscineSpec(1077, "Point", "Piscine Quest 8", "SetPoint() []int",
+			"Create the piscine point whose x coordinate is 42 and y coordinate is 21.", "No input.", "A two-item slice containing x then y.",
+			nil, noFields, "SetPoint()", `nil`,
+			[]practiceCase{pc("Coordinates", ``, jsonString([]int{42, 21}), map[string]any{})}),
+		piscineSpec(1078, "Display File", "Piscine Quest 8", "DisplayFile(arguments []string, files map[string]string) string",
+			"Display one virtual file while handling missing or extra arguments.", "File-name arguments and a map of available file contents.", "The file content or the required diagnostic message.",
+			[]string{"len"}, virtualFilesFields, "DisplayFile(current.Payload.Arguments, current.Payload.Files)", `""`,
+			[]practiceCase{
+				virtualFilesCase("Missing name", []string{}, map[string]string{"a": "A"}, "File name missing\n"),
+				virtualFilesCase("Too many names", []string{"a", "b"}, map[string]string{"a": "A"}, "Too many arguments\n"),
+				virtualFilesCase("Available", []string{"a"}, map[string]string{"a": "hello\n"}, "hello\n"),
+				virtualFilesCase("Unavailable", []string{"x"}, map[string]string{"a": "A"}, "Cannot read file\n"),
+			}),
+		piscineSpec(1079, "Cat", "Piscine Quest 8", "Cat(names []string, files map[string]string, stdin string) string",
+			"Concatenate virtual files, or return standard input when no names are supplied.", "File names, available contents, and simulated standard input.", "Contents in order; missing files contribute a diagnostic line.",
+			[]string{"len"}, catFields, "Cat(current.Payload.Names, current.Payload.Files, current.Payload.Stdin)", `""`,
+			[]practiceCase{
+				catCase("Standard input", []string{}, map[string]string{}, "hello\n", "hello\n"),
+				catCase("One file", []string{"a"}, map[string]string{"a": "A\n"}, "", "A\n"),
+				catCase("Several", []string{"a", "b"}, map[string]string{"a": "A", "b": "B"}, "", "AB"),
+				catCase("Missing", []string{"x"}, map[string]string{}, "", "Cannot read x\n"),
+			}),
+		piscineSpec(1080, "ZTail", "Piscine Quest 8", "ZTail(count int, names []string, files map[string]string) string",
+			"Return the last count bytes of each virtual file.", "A positive byte count, file names, and available contents.", "Tail content in order, with file headings when several names are supplied.",
+			[]string{"len"}, tailFields, "ZTail(current.Payload.Count, current.Payload.Names, current.Payload.Files)", `""`,
+			[]practiceCase{
+				tailCase("Short file", 5, []string{"a"}, map[string]string{"a": "go"}, "go"),
+				tailCase("Suffix", 3, []string{"a"}, map[string]string{"a": "golang"}, "ang"),
+				tailCase("Zero", 0, []string{"a"}, map[string]string{"a": "go"}, ""),
+				tailCase("Missing", 3, []string{"x"}, map[string]string{}, "Cannot read x\n"),
+			}),
+		piscineSpec(1081, "Any", "Piscine Quest 8", "Any(values []string, mode string) bool",
+			"Report whether any value satisfies a selected predicate.", "String values and mode: empty, numeric, or lowercase.", "true when at least one item matches.",
+			nil, stringsModeFields, "Any(current.Payload.Values, current.Payload.Mode)", `false`,
+			[]practiceCase{
+				stringsModeBoolCase("Any empty", []string{"go", ""}, "empty", true),
+				stringsModeBoolCase("None empty", []string{"go"}, "empty", false),
+				stringsModeBoolCase("Any numeric", []string{"go", "42"}, "numeric", true),
+				stringsModeBoolCase("Any lowercase", []string{"GO", "go"}, "lowercase", true),
+			}),
+		piscineSpec(1082, "Count If", "Piscine Quest 8", "CountIf(values []string, mode string) int",
+			"Count values that satisfy a selected predicate.", "String values and mode: empty, numeric, or lowercase.", "The number of matching items.",
+			nil, stringsModeFields, "CountIf(current.Payload.Values, current.Payload.Mode)", `0`,
+			[]practiceCase{
+				stringsModeIntCase("Empty", []string{"", "go", ""}, "empty", 2),
+				stringsModeIntCase("Numeric", []string{"1", "go", "42"}, "numeric", 2),
+				stringsModeIntCase("Lowercase", []string{"go", "GO", "lang"}, "lowercase", 2),
+			}),
+		piscineSpec(1083, "For Each", "Piscine Quest 8", "ForEach(values []int, operation string) []int",
+			"Apply the same operation to every integer.", "Integer values and operation: double, square, or negate.", "A result slice with one transformed value per input.",
+			[]string{"append"}, intsOperationFields, "ForEach(current.Payload.Values, current.Payload.Operation)", `nil`,
+			[]practiceCase{
+				intsOperationCase("Double", []int{1, 2, 3}, "double", []int{2, 4, 6}),
+				intsOperationCase("Square", []int{-2, 3}, "square", []int{4, 9}),
+				intsOperationCase("Negate", []int{-1, 0, 2}, "negate", []int{1, 0, -2}),
+			}),
+		piscineSpec(1084, "Map", "Piscine Quest 8", "Map(values []int, predicate string) []bool",
+			"Evaluate the same predicate for every integer.", "Integer values and predicate: positive, even, or prime.", "A boolean result for each value.",
+			[]string{"append"}, intsPredicateFields, "Map(current.Payload.Values, current.Payload.Predicate)", `nil`,
+			[]practiceCase{
+				intsPredicateCase("Positive", []int{-1, 0, 2}, "positive", []bool{false, false, true}),
+				intsPredicateCase("Even", []int{1, 2, 3}, "even", []bool{false, true, false}),
+				intsPredicateCase("Prime", []int{1, 2, 4, 5}, "prime", []bool{false, true, false, true}),
+			}),
+		piscineSpec(1085, "Fold Int", "Piscine Quest 8", "FoldInt(values []int, initial int, operation string) int",
+			"Fold integers into an accumulator from left to right.", "Values, an initial accumulator, and operation: add, multiply, or maximum.", "The final accumulator.",
+			nil, foldFields, "FoldInt(current.Payload.Values, current.Payload.Initial, current.Payload.Operation)", `0`,
+			[]practiceCase{
+				foldCase("Add", []int{1, 2, 3}, 0, "add", 6),
+				foldCase("Multiply", []int{2, 3, 4}, 1, "multiply", 24),
+				foldCase("Maximum", []int{-2, 7, 3}, -10, "maximum", 7),
+			}),
+		piscineSpec(1086, "Reduce Int", "Piscine Quest 8", "ReduceInt(values []int, operation string) int",
+			"Reduce a non-empty integer slice from its first value.", "Values and operation: add, multiply, or maximum.", "The reduced value; zero for empty input.",
+			[]string{"len"}, intsOperationFields, "ReduceInt(current.Payload.Values, current.Payload.Operation)", `0`,
+			[]practiceCase{
+				intsOperationIntCase("Empty", []int{}, "add", 0),
+				intsOperationIntCase("Add", []int{1, 2, 3}, "add", 6),
+				intsOperationIntCase("Multiply", []int{2, 3, 4}, "multiply", 24),
+				intsOperationIntCase("Maximum", []int{-2, 7, 3}, "maximum", 7),
+			}),
+		piscineSpec(1087, "Is Sorted", "Piscine Quest 8", "IsSorted(values []int, order string) bool",
+			"Check whether integers follow an ascending or descending comparator.", "Integer values and order: ascending or descending.", "true when every neighboring pair follows the requested order.",
+			[]string{"len"}, intsOrderFields, "IsSorted(current.Payload.Values, current.Payload.Order)", `false`,
+			[]practiceCase{
+				intsOrderCase("Empty", []int{}, "ascending", true),
+				intsOrderCase("Ascending", []int{1, 2, 2, 3}, "ascending", true),
+				intsOrderCase("Not ascending", []int{2, 1}, "ascending", false),
+				intsOrderCase("Descending", []int{3, 2, 1}, "descending", true),
+			}),
+		piscineSpec(1088, "Sort Word Array", "Piscine Quest 8", "SortWordArray(values []string) []string",
+			"Sort words lexicographically without the sort package.", "A string slice.", "A new slice in ascending order.",
+			[]string{"append", "len"}, stringsField, "SortWordArray(current.Payload.Values)", `nil`,
+			[]practiceCase{
+				stringsSliceCase("Empty", []string{}, []string{}),
+				stringsSliceCase("Words", []string{"zone", "go", "alpha"}, []string{"alpha", "go", "zone"}),
+				stringsSliceCase("Case", []string{"a", "B", "A"}, []string{"A", "B", "a"}),
+			}),
+		piscineSpec(1089, "Do Operation", "Piscine Quest 9", "DoOperation(left int, operator string, right int) string",
+			"Evaluate one integer arithmetic operation.", "Two integers and one of +, -, *, /, or %.", "The result, or the piscine error text for invalid operations and division by zero.",
+			nil, operationFields, "DoOperation(current.Payload.Left, current.Payload.Operator, current.Payload.Right)", `""`,
+			[]practiceCase{
+				operationCase("Add", 4, "+", 2, "6\n"),
+				operationCase("Divide", 7, "/", 2, "3\n"),
+				operationCase("Divide by zero", 7, "/", 0, "No division by 0\n"),
+				operationCase("Invalid", 7, "x", 2, "0\n"),
+			}),
+		piscineSpec(1090, "Maximum", "Piscine Quest 9", "Maximum(values []int) int",
+			"Return the greatest integer in a slice.", "An integer slice.", "Its maximum, or zero for empty input.",
+			[]string{"len"}, intsField, "Maximum(current.Payload.Values)", `0`,
+			[]practiceCase{
+				intSliceIntCase("Empty", []int{}, 0),
+				intSliceIntCase("Positive", []int{1, 9, 3}, 9),
+				intSliceIntCase("Negative", []int{-9, -2, -7}, -2),
+				intSliceIntCase("Repeated", []int{4, 4}, 4),
 			}),
 	}
 }
