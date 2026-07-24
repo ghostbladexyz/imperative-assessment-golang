@@ -991,6 +991,36 @@ details[open] > summary svg:last-child {
   box-shadow: none;
 }
 
+.editor-panel {
+  height: max(680px, calc(100vh - 110px));
+  display: flex;
+  flex-direction: column;
+  background: var(--code);
+}
+
+.editor-canvas {
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.editor-canvas > div,
+.editor-canvas .cm-editor {
+  height: 100%;
+}
+
+.editor-panel:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  border: 0;
+  background: var(--code);
+}
+
+.editor-panel:fullscreen .panel-toolbar,
+.editor-panel:fullscreen .editor-footer {
+  background: var(--paper-raised);
+}
+
 .panel-toolbar {
   min-height: 47px;
   display: flex;
