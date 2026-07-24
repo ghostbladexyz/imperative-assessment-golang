@@ -9,12 +9,13 @@ import (
 // Duplicate solution variants and exercises already represented elsewhere in
 // the curriculum are intentionally omitted.
 func piscineLevels() []Level {
-	specs := make([]practiceSpec, 0, 90)
-specs = append(specs, piscineQuestTwoSpecs()...)
-specs = append(specs, piscineQuestThreeAndFourSpecs()...)
-specs = append(specs, piscineQuestFiveSpecs()...)
-specs = append(specs, piscineQuestSixAndSevenSpecs()...)
-specs = append(specs, piscineQuestEightAndNineSpecs()...)
+	specs := make([]practiceSpec, 0, 106)
+	specs = append(specs, piscineQuestTwoSpecs()...)
+	specs = append(specs, piscineQuestThreeAndFourSpecs()...)
+	specs = append(specs, piscineQuestFiveSpecs()...)
+	specs = append(specs, piscineQuestSixAndSevenSpecs()...)
+	specs = append(specs, piscineQuestEightAndNineSpecs()...)
+	specs = append(specs, piscineAdvancedSpecs()...)
 
 	levels := make([]Level, 0, len(specs))
 	for _, spec := range specs {
@@ -176,7 +177,7 @@ func piscineQuestThreeAndFourSpecs() []practiceSpec {
 		piscineSpec(1028, "Rune Length", "Piscine Quest 3", "StrLen(value string) int",
 			"Count runes rather than UTF-8 bytes.", "One UTF-8 string.", "The number of Unicode code points.",
 			nil, stringField, "StrLen(current.Payload.Value)", `0`,
-			intStringCases([]string{"", "go", "?", "??", "caf�"}, []int{0, 2, 1, 1, 4})),
+			intStringCases([]string{"", "go", "γ", "🙂", "café"}, []int{0, 2, 1, 1, 4})),
 		piscineSpec(1029, "Prime Check", "Piscine Quest 4", "IsPrime(value int) bool",
 			"Determine whether an integer is prime.", "One integer.", "true only for prime values greater than 1.",
 			nil, intField, "IsPrime(current.Payload.Value)", `false`,
@@ -252,23 +253,23 @@ func piscineQuestFiveSpecs() []practiceSpec {
 			nil, stringField, "FirstRune(current.Payload.Value)", `0`,
 			[]practiceCase{
 				runeOutputCase("ASCII", "go", 'g'),
-				runeOutputCase("Greek", "?�?�", '?'),
-				runeOutputCase("Emoji", "??ok", '??'),
+				runeOutputCase("Greek", "γεια", 'γ'),
+				runeOutputCase("Emoji", "🙂ok", '🙂'),
 			}),
 		piscineSpec(1037, "Last Rune", "Piscine Quest 5", "LastRune(value string) rune",
 			"Return the final Unicode code point.", "A non-empty UTF-8 string.", "Its last rune.",
 			nil, stringField, "LastRune(current.Payload.Value)", `0`,
 			[]practiceCase{
 				runeOutputCase("ASCII", "go", 'o'),
-				runeOutputCase("Greek", "?�?�", '�'),
-				runeOutputCase("Emoji", "ok??", '??'),
+				runeOutputCase("Greek", "γεια", 'α'),
+				runeOutputCase("Emoji", "ok🙂", '🙂'),
 			}),
 		piscineSpec(1038, "Nth Rune", "Piscine Quest 5", "NRune(value string, position int) rune",
 			"Return a rune by one-based position.", "A UTF-8 string and position.", "The selected rune, or 0 when the position is invalid.",
 			nil, stringPositionFields, "NRune(current.Payload.Value, current.Payload.Position)", `0`,
 			[]practiceCase{
 				runePositionCase("First", "hello", 1, 'h'),
-				runePositionCase("Middle", "?�?�", 2, '�'),
+				runePositionCase("Middle", "γεια", 2, 'ε'),
 				runePositionCase("Too high", "go", 3, 0),
 				runePositionCase("Zero", "go", 0, 0),
 			}),
@@ -285,15 +286,15 @@ func piscineQuestFiveSpecs() []practiceSpec {
 		piscineSpec(1040, "Is Alphanumeric", "Piscine Quest 5", "IsAlpha(value string) bool",
 			"Validate that a string contains only ASCII letters and digits.", "One string.", "true for alphanumeric or empty input.",
 			nil, stringField, "IsAlpha(current.Payload.Value)", `false`,
-			boolStringCases([]string{"", "abcXYZ", "abc123", "hello world", "caf�"}, []bool{true, true, true, false, false})),
+			boolStringCases([]string{"", "abcXYZ", "abc123", "hello world", "café"}, []bool{true, true, true, false, false})),
 		piscineSpec(1041, "Is Lowercase", "Piscine Quest 5", "IsLower(value string) bool",
 			"Validate that every character is an ASCII lowercase letter.", "One string.", "true for lowercase-only or empty input.",
 			nil, stringField, "IsLower(current.Payload.Value)", `false`,
-			boolStringCases([]string{"", "abc", "a1", "Abc", "�"}, []bool{true, true, false, false, false})),
+			boolStringCases([]string{"", "abc", "a1", "Abc", "é"}, []bool{true, true, false, false, false})),
 		piscineSpec(1042, "Is Numeric", "Piscine Quest 5", "IsNumeric(value string) bool",
 			"Validate that every character is an ASCII decimal digit.", "One string.", "true for digit-only or empty input.",
 			nil, stringField, "IsNumeric(current.Payload.Value)", `false`,
-			boolStringCases([]string{"", "0123", "-1", "1.0", "12"}, []bool{true, true, false, false, false})),
+			boolStringCases([]string{"", "0123", "-1", "1.0", "１２"}, []bool{true, true, false, false, false})),
 		piscineSpec(1043, "Is Printable", "Piscine Quest 5", "IsPrintable(value string) bool",
 			"Validate that every rune is printable.", "One string.", "true when all runes are at least the space character.",
 			nil, stringField, "IsPrintable(current.Payload.Value)", `false`,
@@ -301,7 +302,7 @@ func piscineQuestFiveSpecs() []practiceSpec {
 		piscineSpec(1044, "Is Uppercase", "Piscine Quest 5", "IsUpper(value string) bool",
 			"Validate that every character is an ASCII uppercase letter.", "One string.", "true for uppercase-only or empty input.",
 			nil, stringField, "IsUpper(current.Payload.Value)", `false`,
-			boolStringCases([]string{"", "ABC", "A1", "AbC", "�"}, []bool{true, true, false, false, false})),
+			boolStringCases([]string{"", "ABC", "A1", "AbC", "É"}, []bool{true, true, false, false, false})),
 		piscineSpec(1045, "To Lower", "Piscine Quest 5", "ToLower(value string) string",
 			"Convert ASCII uppercase letters to lowercase.", "One string.", "The converted string with non-uppercase data unchanged.",
 			nil, stringField, "ToLower(current.Payload.Value)", `""`,
@@ -353,7 +354,7 @@ func piscineQuestFiveSpecs() []practiceSpec {
 				numberBaseCase("Duplicate digit", 10, "001", "NV"),
 			}),
 		piscineSpec(1052, "Alphabet Mirror", "Piscine Quest 5", "AlphaMirror(value string) string",
-			"Replace each ASCII letter with its opposite in the alphabet.", "One string.", "az, by, preserving case and other characters.",
+			"Replace each ASCII letter with its opposite in the alphabet.", "One string.", "a↔z, b↔y, preserving case and other characters.",
 			nil, stringField, "AlphaMirror(current.Payload.Value)", `""`,
 			stringCases([]string{"", "abc", "XYZ", "Hello!", "azAZ"}, []string{"", "zyx", "CBA", "Svool!", "zaZA"})),
 		piscineSpec(1053, "ROT13", "Piscine Quest 5", "Rot13(value string) string",
@@ -660,6 +661,142 @@ func piscineQuestEightAndNineSpecs() []practiceSpec {
 	}
 }
 
+func piscineAdvancedSpecs() []practiceSpec {
+	return []practiceSpec{
+		piscineSpec(1091, "Abort", "Piscine Advanced", "Abort(a int, b int, c int, d int, e int) int",
+			"Return the median of five integers.", "Five integers.", "The value that would occupy the middle position when sorted.",
+			nil, fiveIntsFields, "Abort(current.Payload.A, current.Payload.B, current.Payload.C, current.Payload.D, current.Payload.E)", `0`,
+			[]practiceCase{
+				fiveIntsCase("Ordered", []int{1, 2, 3, 4, 5}, 3),
+				fiveIntsCase("Mixed", []int{9, 1, 7, 3, 5}, 5),
+				fiveIntsCase("Duplicates", []int{2, 1, 2, 3, 2}, 2),
+			}),
+		piscineSpec(1092, "Food Delivery Time", "Piscine Advanced", "FoodDeliveryTime(order string) int",
+			"Calculate a delivery estimate from the foods in an order.", "A comma-separated order using burger, chips, nuggets, and drink.", "The longest preparation time among valid items; -1 for an invalid order.",
+			[]string{"len"}, stringField, "FoodDeliveryTime(current.Payload.Value)", `-1`,
+			intStringCases([]string{"burger", "chips,drink", "nuggets,burger", "", "pizza"}, []int{15, 10, 15, -1, -1})),
+		piscineSpec(1093, "Unmatch", "Piscine Advanced", "Unmatch(values []int) int",
+			"Find the value without a matching duplicate.", "Integers where every value except at most one appears an even number of times.", "The unmatched value, or -1 when all values pair.",
+			nil, intsField, "Unmatch(current.Payload.Values)", `-1`,
+			[]practiceCase{
+				intSliceIntCase("All paired", []int{1, 1, 2, 2}, -1),
+				intSliceIntCase("One unmatched", []int{1, 2, 1}, 2),
+				intSliceIntCase("Zero", []int{0, 3, 3}, 0),
+				intSliceIntCase("Empty", []int{}, -1),
+			}),
+		piscineSpec(1094, "Reverse Bits", "Piscine Advanced", "ReverseBits(value byte) byte",
+			"Reverse the order of all eight bits in a byte.", "One byte value.", "The bit-reversed byte.",
+			nil, byteField, "ReverseBits(current.Payload.Value)", `0`,
+			[]practiceCase{
+				byteCase("Zero", 0, 0),
+				byteCase("One", 1, 128),
+				byteCase("Pattern", 0b00110100, 0b00101100),
+				byteCase("All ones", 255, 255),
+			}),
+		piscineSpec(1095, "Swap Bits", "Piscine Advanced", "SwapBits(value byte) byte",
+			"Swap the high and low four-bit halves of a byte.", "One byte value.", "The byte with its nibbles exchanged.",
+			nil, byteField, "SwapBits(current.Payload.Value)", `0`,
+			[]practiceCase{
+				byteCase("Zero", 0, 0),
+				byteCase("Low nibble", 0x0f, 0xf0),
+				byteCase("Pattern", 0x3c, 0xc3),
+				byteCase("Equal halves", 0xaa, 0xaa),
+			}),
+		piscineSpec(1096, "Print Bits", "Piscine Advanced", "PrintBits(value byte) string",
+			"Format all eight bits of a byte.", "One byte value.", "Exactly eight binary digits followed by newline.",
+			nil, byteField, "PrintBits(current.Payload.Value)", `""`,
+			[]practiceCase{
+				byteStringCase("Zero", 0, "00000000\n"),
+				byteStringCase("One", 1, "00000001\n"),
+				byteStringCase("Pattern", 0x3c, "00111100\n"),
+				byteStringCase("Maximum", 255, "11111111\n"),
+			}),
+		piscineSpec(1097, "Two's Complement", "Piscine Advanced", "TwosComplement(value int, width int) string",
+			"Format an integer as a fixed-width two's-complement bit pattern.", "An integer and bit width from 1 through 64.", "Exactly width binary digits.",
+			nil, valueWidthFields, "TwosComplement(current.Payload.Value, current.Payload.Width)", `""`,
+			[]practiceCase{
+				valueWidthCase("Positive", 5, 8, "00000101"),
+				valueWidthCase("Minus one", -1, 8, "11111111"),
+				valueWidthCase("Negative", -5, 8, "11111011"),
+				valueWidthCase("Four bits", -2, 4, "1110"),
+			}),
+		piscineSpec(1098, "Print Hex", "Piscine Advanced", "PrintHex(value int) string",
+			"Format a non-negative integer in lowercase hexadecimal.", "One non-negative integer.", "The hexadecimal digits followed by newline.",
+			nil, intField, "PrintHex(current.Payload.Value)", `""`,
+			[]practiceCase{
+				intOutputCase("Zero", 0, "0\n"),
+				intOutputCase("Ten", 10, "a\n"),
+				intOutputCase("Byte", 255, "ff\n"),
+				intOutputCase("Large", 4096, "1000\n"),
+			}),
+		piscineSpec(1099, "Multiplication Table", "Piscine Advanced", "MultiplicationTable(value int) string",
+			"Generate the multiplication table from one through nine.", "One integer.", "Nine lines in the form n x value = result.",
+			nil, intField, "MultiplicationTable(current.Payload.Value)", `""`,
+			[]practiceCase{
+				intOutputCase("Two", 2, multiplicationTableExpected(2)),
+				intOutputCase("Zero", 0, multiplicationTableExpected(0)),
+				intOutputCase("Negative", -3, multiplicationTableExpected(-3)),
+			}),
+		piscineSpec(1100, "Reverse Words", "Piscine Advanced", "ReverseWords(value string) string",
+			"Reverse the order of whitespace-separated words.", "One string.", "Words joined by single spaces followed by newline.",
+			[]string{"append", "len"}, stringField, "ReverseWords(current.Payload.Value)", `"\n"`,
+			stringCases(
+				[]string{"", "hello", "hello world", "  go\tis\nfun "},
+				[]string{"\n", "hello\n", "world hello\n", "fun is go\n"},
+			)),
+		piscineSpec(1101, "Rotate String", "Piscine Advanced", "RotateString(value string) string",
+			"Move the first whitespace-separated word to the end.", "One string.", "Normalized words after one left rotation, followed by newline.",
+			[]string{"append", "len"}, stringField, "RotateString(current.Payload.Value)", `"\n"`,
+			stringCases(
+				[]string{"", "hello", "hello world", "  one two three "},
+				[]string{"\n", "hello\n", "world hello\n", "two three one\n"},
+			)),
+		piscineSpec(1102, "Roman Numbers", "Piscine Advanced", "RomanNumbers(value int) string",
+			"Convert an integer from 1 through 3999 to Roman numerals.", "One integer.", "The uppercase Roman representation, or ERROR for an out-of-range value.",
+			nil, intField, "RomanNumbers(current.Payload.Value)", `""`,
+			[]practiceCase{
+				intOutputCase("One", 1, "I"),
+				intOutputCase("Subtractive", 944, "CMXLIV"),
+				intOutputCase("Maximum", 3999, "MMMCMXCIX"),
+				intOutputCase("Invalid", 0, "ERROR"),
+			}),
+		piscineSpec(1103, "RPN Calculator", "Piscine Advanced", "RPNCalculator(expression string) string",
+			"Evaluate a space-separated reverse Polish notation expression.", "Integers and +, -, *, /, or % operators.", "The integer result followed by newline, or Error for malformed input.",
+			[]string{"append", "len"}, expressionField, "RPNCalculator(current.Payload.Expression)", `""`,
+			[]practiceCase{
+				expressionCase("Add", "2 3 +", "5\n"),
+				expressionCase("Nested", "5 1 2 + 4 * + 3 -", "14\n"),
+				expressionCase("Negative", "-3 2 *", "-6\n"),
+				expressionCase("Malformed", "2 +", "Error\n"),
+			}),
+		piscineSpec(1104, "Grouping", "Piscine Advanced", "Grouping(pattern string, value string) []string",
+			"Find substrings matching a simplified parenthesized alternation pattern.", "A pattern such as (a|b) and a value to scan.", "Matches in encounter order.",
+			[]string{"append", "len"}, patternValueFields, "Grouping(current.Payload.Pattern, current.Payload.Value)", `nil`,
+			[]practiceCase{
+				groupingCase("Alternatives", "(cat|dog)", "a cat and a dog", []string{"cat", "dog"}),
+				groupingCase("Repeated", "(go|lang)", "gogolang", []string{"go", "go", "lang"}),
+				groupingCase("No match", "(a|b)", "xyz", []string{}),
+				groupingCase("Literal", "(01|edu)", "01-edu", []string{"01", "edu"}),
+			}),
+		piscineSpec(1105, "Find Pairs", "Piscine Advanced", "FindPairs(values []int, target int) [][]int",
+			"Find disjoint pairs whose sum equals a target.", "Integer values and target sum.", "Pairs in encounter order; each input position may be used once.",
+			[]string{"append", "len"}, intsTargetFields, "FindPairs(current.Payload.Values, current.Payload.Target)", `nil`,
+			[]practiceCase{
+				findPairsCase("None", []int{1, 2}, 10, [][]int{}),
+				findPairsCase("One", []int{1, 2, 3}, 4, [][]int{{1, 3}}),
+				findPairsCase("Several", []int{1, 5, 3, 3, 2, 4}, 6, [][]int{{1, 5}, {3, 3}, {2, 4}}),
+				findPairsCase("Duplicates", []int{2, 2, 2, 2}, 4, [][]int{{2, 2}, {2, 2}}),
+			}),
+		piscineSpec(1106, "Word Flip", "Piscine Advanced", "WordFlip(value string) string",
+			"Reverse the characters of each word while preserving word order.", "One whitespace-separated string.", "Flipped words joined by single spaces followed by newline.",
+			[]string{"append", "len"}, stringField, "WordFlip(current.Payload.Value)", `"\n"`,
+			stringCases(
+				[]string{"", "hello", "hello world", "  go\tis\nfun "},
+				[]string{"\n", "olleh\n", "olleh dlrow\n", "og si nuf\n"},
+			)),
+	}
+}
+
 func piscineSpec(
 	id int,
 	title, difficulty, signature, objective, input, output string,
@@ -670,7 +807,7 @@ func piscineSpec(
 	return zoneSpec(
 		id,
 		title,
-		"Piscine � "+strings.TrimPrefix(difficulty, "Piscine "),
+		"Piscine · "+strings.TrimPrefix(difficulty, "Piscine "),
 		difficulty,
 		signature,
 		objective,
