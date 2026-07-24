@@ -256,7 +256,7 @@ func TestDockerRunCleansUpAfterSuccessFailureAndOutputOverflow(t *testing.T) {
 				return CommandResult{}
 			}}
 			instance := testDocker(fake)
-			level, _ := assessment.FindLevel(1)
+			level, _ := assessment.FindLevel(22)
 			result := instance.Run(context.Background(), level, "func NormalizeTokens(input string) []string { return []string{\"word\"} }", []string{"l1-word"})
 			if cleanupCalls != 1 {
 				t.Fatalf("got %d cleanup calls", cleanupCalls)
@@ -281,7 +281,7 @@ func TestDockerRunCancellationForcesCleanup(t *testing.T) {
 		return CommandResult{}
 	}}
 	instance := testDocker(fake)
-	level, _ := assessment.FindLevel(1)
+	level, _ := assessment.FindLevel(22)
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan RunResult, 1)
 	go func() {
@@ -301,7 +301,7 @@ func TestDockerRunCancellationForcesCleanup(t *testing.T) {
 }
 
 func TestDockerMapsSandboxTimeoutAndRejectsMalformedResponse(t *testing.T) {
-	level, _ := assessment.FindLevel(1)
+	level, _ := assessment.FindLevel(22)
 	for _, test := range []struct {
 		name      string
 		response  string
@@ -406,7 +406,7 @@ func TestDockerRunnerAtCapacity(t *testing.T) {
 		return CommandResult{Err: errors.New("gone"), Stderr: "No such container"}
 	}}
 	instance := testDocker(fake)
-	level, _ := assessment.FindLevel(1)
+	level, _ := assessment.FindLevel(22)
 	done := make(chan struct{})
 	go func() {
 		instance.Run(context.Background(), level, "func NormalizeTokens(input string) []string { return []string{\"word\"} }", []string{"l1-word"})
