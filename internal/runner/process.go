@@ -62,11 +62,12 @@ func runCommandInput(parent context.Context, limit int, stdin []byte, name strin
 func parseResults(stdout string) []wireResult {
 	var results []wireResult
 	for _, line := range strings.Split(strings.ReplaceAll(stdout, "\r\n", "\n"), "\n") {
-		if !strings.HasPrefix(line, "__IMPERATIVE_ASSESSMENT_RESULT__") {
+		_, payload, found := splitResultLine(line, "__IMPERATIVE_ASSESSMENT_RESULT__")
+		if !found {
 			continue
 		}
 		var result wireResult
-		if json.Unmarshal([]byte(strings.TrimPrefix(line, "__IMPERATIVE_ASSESSMENT_RESULT__")), &result) == nil {
+		if json.Unmarshal([]byte(payload), &result) == nil {
 			results = append(results, result)
 		}
 	}
@@ -77,9 +78,24 @@ func stripMarkers(stdout string) string {
 	lines := strings.Split(strings.ReplaceAll(stdout, "\r\n", "\n"), "\n")
 	kept := lines[:0]
 	for _, line := range lines {
-		if !strings.HasPrefix(line, "__IMPERATIVE_ASSESSMENT_RESULT__") {
+		prefix, _, found := splitResultLine(line, "__IMPERATIVE_ASSESSMENT_RESULT__")
+		if found {
+			kept = append(kept, prefix)
+		} else {
 			kept = append(kept, line)
 		}
 	}
 	return strings.TrimSpace(strings.Join(kept, "\n"))
+}
+
+func splitResultLine(line, marker string) (string, string, bool) {
+	index := strings.Index(line, marker)
+	if index < 0 {
+		return "", "", false
+	}
+	payload := line[index+len(marker):]
+	if !json.Valid([]byte(payload)) {
+		return "", "", false
+	}
+	return line[:index], payload, true
 }
