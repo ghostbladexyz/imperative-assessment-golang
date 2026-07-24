@@ -54,7 +54,7 @@ It keeps the same execution and output limits but is not a sandbox.
 - Work through the exercises in order; passing every visible test unlocks the
   next exercise.
 - Use **Test** for feedback, **gofmt** to format the code, and **.go** to download
-  the current solution.
+  the current editor contents.
 - Progress and editor layout are saved in the browser on the current device.
 - Drag the panel dividers to resize the instructions, editor, tests, and console.
 

@@ -22,7 +22,7 @@ Do not include real credentials, private keys, or unrelated personal data in a r
 
 The server binds to `127.0.0.1` by default and selects the runner at startup. Browser requests cannot change that selection.
 
-In Docker mode, each submission receives a new non-root container with no network, a read-only root filesystem, dropped capabilities, `no-new-privileges`, resource limits, bounded tmpfs mounts, and no host bind mounts. The submitted source and server-generated harness travel through a bounded JSON request on standard input. The exact container is force-removed after every outcome.
+In Docker mode, each submission receives a new non-root container with no network or shared IPC, a read-only root filesystem, dropped capabilities, `no-new-privileges`, resource limits, bounded tmpfs mounts, no host bind mounts, and no Docker log persistence. The submitted source and server-generated harness travel through a bounded JSON request on standard input. Docker cannot pull an image while handling a submission. The exact container is force-removed after every outcome, and a later startup removes any labeled non-running container left by an abrupt host-process exit.
 
 The following remain trusted:
 
@@ -31,7 +31,7 @@ The following remain trusted:
 - The assessment server process and its server-owned harness
 - The local receipt signing key
 
-The runner image deliberately contains a pinned Go toolchain, fixed entrypoint, and precompiled standard-library cache. It must not contain assessment solutions, host credentials, receipt keys, the Docker CLI, or the Docker socket.
+The scratch-based runner image deliberately contains only a pinned Go toolchain, fixed entrypoint, and precompiled standard-library cache. Its allowlisted build context excludes the assessment catalogue and other repository data. It must not contain assessment solutions, host credentials, receipt keys, the Docker CLI, or the Docker socket.
 
 ## Known limitations
 

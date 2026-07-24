@@ -1,4 +1,4 @@
-FROM golang:1.23.12-alpine3.22@sha256:383395b794dffa5b53012a212365d40c8e37109a626ca30d6151c8348d380b5f AS builder
+FROM golang:1.26.5-alpine3.24@sha256:0178a641fbb4858c5f1b48e34bdaabe0350a330a1b1149aabd498d0699ff5fb2 AS builder
 
 WORKDIR /src
 COPY go.mod ./
@@ -6,7 +6,7 @@ COPY internal/sandboxprotocol ./internal/sandboxprotocol
 COPY cmd/sandbox-runner ./cmd/sandbox-runner
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/sandbox-runner ./cmd/sandbox-runner
 
-FROM golang:1.23.12-alpine3.22@sha256:383395b794dffa5b53012a212365d40c8e37109a626ca30d6151c8348d380b5f
+FROM golang:1.26.5-alpine3.24@sha256:0178a641fbb4858c5f1b48e34bdaabe0350a330a1b1149aabd498d0699ff5fb2 AS toolchain
 
 RUN mkdir -p /opt/go-build \
     && GOCACHE=/opt/go-build CGO_ENABLED=0 GOMAXPROCS=1 go install -p=1 -trimpath \
@@ -25,10 +25,14 @@ RUN mkdir -p /opt/go-build \
     sync/atomic \
     time \
     && chmod -R a+rX /opt/go-build
-RUN addgroup -S -g 65532 sandbox \
-    && adduser -S -D -H -u 65532 -G sandbox sandbox
-COPY --from=builder --chown=65532:65532 /out/sandbox-runner /usr/local/bin/sandbox-runner
+
+FROM scratch
+
+ENV PATH=/usr/local/go/bin
+COPY --from=toolchain --chown=65532:65532 /usr/local/go /usr/local/go
+COPY --from=toolchain --chown=65532:65532 /opt/go-build /opt/go-build
+COPY --from=builder --chown=65532:65532 /out/sandbox-runner /sandbox-runner
 
 USER 65532:65532
 WORKDIR /workspace
-ENTRYPOINT ["/usr/local/bin/sandbox-runner"]
+ENTRYPOINT ["/sandbox-runner"]

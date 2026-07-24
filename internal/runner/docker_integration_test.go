@@ -2,7 +2,9 @@ package runner
 
 import (
 	"context"
+	"encoding/json"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -105,6 +107,102 @@ func TestDockerRunnerIntegration(t *testing.T) {
 		assertNoAssessmentContainers(t)
 	})
 
+	t.Run("effective container configuration is isolated", func(t *testing.T) {
+		assertNoAssessmentContainers(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		done := make(chan RunResult, 1)
+		go func() {
+			done <- sandbox.Run(
+				ctx,
+				level,
+				`func CountAlpha(input string) int { for {} }`,
+				[]string{"l29-02"},
+			)
+		}()
+
+		name := waitForAssessmentContainer(t)
+		inspection := inspectAssessmentContainer(t, name)
+		if !inspection.State.Running {
+			t.Fatal("sandbox container was not running while submission executed")
+		}
+		if inspection.Config.Image != sandbox.Info().DockerImage ||
+			inspection.Config.User != "65532:65532" ||
+			inspection.Path != "/sandbox-runner" {
+			t.Fatalf("unexpected sandbox identity: %#v", inspection)
+		}
+		if inspection.HostConfig.NetworkMode != "none" ||
+			inspection.HostConfig.IpcMode != "none" ||
+			!inspection.HostConfig.ReadonlyRootfs ||
+			inspection.HostConfig.LogConfig.Type != "none" {
+			t.Fatalf("sandbox namespaces or filesystem are not isolated: %#v", inspection.HostConfig)
+		}
+		if !slices.Contains(inspection.HostConfig.CapDrop, "ALL") ||
+			!slices.Contains(inspection.HostConfig.SecurityOpt, "no-new-privileges") {
+			t.Fatalf("sandbox privilege restrictions are missing: %#v", inspection.HostConfig)
+		}
+		if inspection.HostConfig.Memory != 256*1024*1024 ||
+			inspection.HostConfig.MemorySwap != 256*1024*1024 ||
+			inspection.HostConfig.NanoCpus != 1_000_000_000 ||
+			inspection.HostConfig.PidsLimit != 64 {
+			t.Fatalf("sandbox resource limits are not effective: %#v", inspection.HostConfig)
+		}
+		if len(inspection.HostConfig.Binds) != 0 || len(inspection.HostConfig.Mounts) != 0 {
+			t.Fatalf("sandbox unexpectedly has host mounts: %#v", inspection.HostConfig)
+		}
+		for _, required := range []string{"/tmp", "/tmp/go-build", "/workspace"} {
+			if _, ok := inspection.HostConfig.Tmpfs[required]; !ok {
+				t.Fatalf("sandbox is missing tmpfs %s: %#v", required, inspection.HostConfig.Tmpfs)
+			}
+		}
+		for _, environment := range inspection.Config.Env {
+			name, _, _ := strings.Cut(environment, "=")
+			if !slices.Contains([]string{
+				"CGO_ENABLED", "GOCACHE", "GOGC", "GOENV", "GOMAXPROCS",
+				"GOMEMLIMIT", "GOPATH", "GOPROXY", "GOTELEMETRY", "GOTOOLCHAIN",
+				"GOTMPDIR", "HOME", "PATH",
+			}, name) {
+				t.Fatalf("sandbox inherited unexpected environment variable %q", name)
+			}
+		}
+
+		cancel()
+		result := <-done
+		if !result.Stopped {
+			t.Fatalf("expected stopped result: %#v", result)
+		}
+		assertNoAssessmentContainers(t)
+	})
+
+	t.Run("startup removes a stale created container", func(t *testing.T) {
+		assertNoAssessmentContainers(t)
+		name := "imperative-go-assessment-ffeeddccbbaa998877665544"
+		t.Cleanup(func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			_, _, _, _ = runCommand(ctx, 64*1024, "docker", "rm", "--force", name)
+		})
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		_, stderr, err, _ := runCommand(
+			ctx,
+			64*1024,
+			"docker",
+			"create",
+			"--name",
+			name,
+			"--label",
+			dockerContainerLabel,
+			sandbox.Info().DockerImage,
+		)
+		cancel()
+		if err != nil {
+			t.Fatalf("create stale sandbox fixture: %v: %s", err, stderr)
+		}
+		if err := cleanupStaleContainers(context.Background(), commands, "docker"); err != nil {
+			t.Fatal(err)
+		}
+		assertNoAssessmentContainers(t)
+	})
+
 	t.Run("external network is unavailable", func(t *testing.T) {
 		result := sandbox.Run(
 			context.Background(),
@@ -197,6 +295,75 @@ func CountAlpha(input string) int {
 			assertNoAssessmentContainers(t)
 		}
 	})
+}
+
+type dockerInspection struct {
+	Path   string
+	Config struct {
+		Env   []string
+		Image string
+		User  string
+	}
+	State struct {
+		Running bool
+	}
+	HostConfig struct {
+		Binds          []string
+		CapDrop        []string
+		IpcMode        string
+		Memory         int64
+		MemorySwap     int64
+		Mounts         []struct{}
+		NanoCpus       int64
+		NetworkMode    string
+		PidsLimit      int64
+		ReadonlyRootfs bool
+		SecurityOpt    []string
+		Tmpfs          map[string]string
+		LogConfig      struct {
+			Type string
+		}
+	}
+}
+
+func waitForAssessmentContainer(t *testing.T) string {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		stdout, _, err, _ := runCommand(
+			ctx,
+			64*1024,
+			"docker",
+			"ps",
+			"--filter",
+			"label="+dockerContainerLabel,
+			"--format",
+			"{{.Names}}",
+		)
+		cancel()
+		if err == nil && strings.TrimSpace(stdout) != "" {
+			return strings.TrimSpace(stdout)
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+	t.Fatal("sandbox container did not start")
+	return ""
+}
+
+func inspectAssessmentContainer(t *testing.T, name string) dockerInspection {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	stdout, stderr, err, _ := runCommand(ctx, 1024*1024, "docker", "inspect", name)
+	if err != nil {
+		t.Fatalf("inspect sandbox container: %v: %s", err, stderr)
+	}
+	var inspections []dockerInspection
+	if err := json.Unmarshal([]byte(stdout), &inspections); err != nil || len(inspections) != 1 {
+		t.Fatalf("decode sandbox inspection: %v", err)
+	}
+	return inspections[0]
 }
 
 func assertNoAssessmentContainers(t *testing.T) {

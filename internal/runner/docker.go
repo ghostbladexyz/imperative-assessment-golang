@@ -21,8 +21,9 @@ import (
 )
 
 const (
-	dockerGoVersion        = "go1.23.12"
+	dockerGoVersion        = "go1.26.5"
 	dockerImageRepository  = "imperative-go-assessment-runner"
+	dockerContainerLabel   = "io.github.pleft.imperative-assessment.role=sandbox"
 	dockerBuildOutputLimit = 2 * 1024 * 1024
 	dockerRunOutputLimit   = 2 * 1024 * 1024
 	dockerCleanupTimeout   = 5 * time.Second
@@ -82,6 +83,9 @@ func NewDocker(ctx context.Context, options DockerOptions) (*Engine, error) {
 	if err := CheckDocker(ctx, options.Commands, options.DockerBinary); err != nil {
 		return nil, err
 	}
+	if err := cleanupStaleContainers(ctx, options.Commands, options.DockerBinary); err != nil {
+		return nil, err
+	}
 	root := options.ProjectRoot
 	if root == "" {
 		var err error
@@ -133,6 +137,40 @@ func NewDocker(ctx context.Context, options DockerOptions) (*Engine, error) {
 		commands:     options.Commands,
 		random:       options.Random,
 	}, options.MaxConcurrent, options.Receipts), nil
+}
+
+func cleanupStaleContainers(ctx context.Context, commands CommandExecutor, dockerBinary string) error {
+	found := commands.Run(
+		ctx,
+		64*1024,
+		nil,
+		dockerBinary,
+		"ps",
+		"--all",
+		"--filter",
+		"label="+dockerContainerLabel,
+		"--filter",
+		"status=created",
+		"--filter",
+		"status=exited",
+		"--filter",
+		"status=dead",
+		"--format",
+		"{{.Names}}",
+	)
+	if found.Err != nil {
+		return errors.New("the Docker sandbox could not check for stale containers")
+	}
+	cleaner := &dockerAdapter{dockerBinary: dockerBinary, commands: commands}
+	for _, name := range strings.Fields(found.Stdout) {
+		if !containerNamePattern.MatchString(name) {
+			return errors.New("the Docker sandbox found an invalid stale container name")
+		}
+		if err := cleaner.cleanup(name); err != nil {
+			return errors.New("the Docker sandbox could not remove a stale container")
+		}
+	}
+	return nil
 }
 
 func CheckDocker(ctx context.Context, commands CommandExecutor, dockerBinary string) error {
@@ -314,17 +352,23 @@ func dockerRunArgs(name, image string) []string {
 	return []string{
 		"run",
 		"--name", name,
+		"--label", dockerContainerLabel,
 		"--rm",
 		"--interactive",
+		"--pull", "never",
 		"--network", "none",
+		"--ipc", "none",
 		"--read-only",
 		"--cap-drop", "ALL",
 		"--security-opt", "no-new-privileges",
+		"--log-driver", "none",
+		"--hostname", "sandbox",
 		"--memory", "256m",
 		"--memory-swap", "256m",
 		"--cpus", "1",
 		"--pids-limit", "64",
 		"--ulimit", "nofile=128:128",
+		"--ulimit", "core=0:0",
 		"--tmpfs", "/tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777",
 		"--tmpfs", "/tmp/go-build:rw,noexec,nosuid,nodev,size=96m,uid=65532,gid=65532,mode=0700",
 		"--tmpfs", "/workspace:rw,exec,nosuid,nodev,size=32m,uid=65532,gid=65532,mode=0700",
@@ -332,10 +376,12 @@ func dockerRunArgs(name, image string) []string {
 		"--env", "CGO_ENABLED=0",
 		"--env", "HOME=/tmp",
 		"--env", "GOCACHE=/tmp/go-build",
+		"--env", "GOENV=off",
 		"--env", "GOTMPDIR=/tmp",
 		"--env", "GOPATH=/tmp/go",
 		"--env", "GOPROXY=off",
 		"--env", "GOTOOLCHAIN=local",
+		"--env", "GOTELEMETRY=off",
 		"--env", "GOMAXPROCS=1",
 		"--env", "GOMEMLIMIT=128MiB",
 		"--env", "GOGC=50",
@@ -347,6 +393,7 @@ func dockerRunArgs(name, image string) []string {
 func dockerBuildArgs(root, image string) []string {
 	return []string{
 		"build",
+		"--network", "none",
 		"--file", filepath.Join(root, "docker", "runner.Dockerfile"),
 		"--tag", image,
 		root,

@@ -136,6 +136,8 @@ func TestNewDockerReusesCachedImageAndBuildsMissingImage(t *testing.T) {
 					return CommandResult{Stdout: "Docker version 29"}
 				case "info":
 					return CommandResult{Stdout: "29.2.1"}
+				case "ps":
+					return CommandResult{}
 				case "image":
 					if cached {
 						return CommandResult{Stdout: "sha256:image"}
@@ -169,13 +171,81 @@ func TestNewDockerReusesCachedImageAndBuildsMissingImage(t *testing.T) {
 	}
 }
 
+func TestDockerStartupRemovesOnlyValidatedStoppedSandboxContainers(t *testing.T) {
+	valid := "imperative-go-assessment-00112233445566778899aabb"
+	for _, test := range []struct {
+		name       string
+		list       CommandResult
+		remove     CommandResult
+		wantErr    string
+		wantRemove bool
+	}{
+		{name: "none"},
+		{name: "stale", list: CommandResult{Stdout: valid + "\n"}, wantRemove: true},
+		{
+			name:    "invalid name",
+			list:    CommandResult{Stdout: "unrelated-container\n"},
+			wantErr: "invalid stale container name",
+		},
+		{
+			name:       "cleanup failure",
+			list:       CommandResult{Stdout: valid + "\n"},
+			remove:     CommandResult{Err: errors.New("daemon error")},
+			wantErr:    "could not remove a stale container",
+			wantRemove: true,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			removed := false
+			fake := &fakeExecutor{run: func(_ context.Context, _ int, _ []byte, _ string, args ...string) CommandResult {
+				switch args[0] {
+				case "ps":
+					joined := strings.Join(args, " ")
+					for _, required := range []string{
+						"label=" + dockerContainerLabel,
+						"status=created",
+						"status=exited",
+						"status=dead",
+					} {
+						if !strings.Contains(joined, required) {
+							t.Fatalf("missing stale-container filter %q in %v", required, args)
+						}
+					}
+					return test.list
+				case "rm":
+					removed = true
+					if args[len(args)-1] != valid {
+						t.Fatalf("removed unexpected container: %v", args)
+					}
+					return test.remove
+				default:
+					t.Fatalf("unexpected command: %v", args)
+					return CommandResult{}
+				}
+			}}
+			err := cleanupStaleContainers(context.Background(), fake, "docker")
+			if test.wantErr == "" && err != nil {
+				t.Fatal(err)
+			}
+			if test.wantErr != "" && (err == nil || !strings.Contains(err.Error(), test.wantErr)) {
+				t.Fatalf("expected %q, got %v", test.wantErr, err)
+			}
+			if removed != test.wantRemove {
+				t.Fatalf("removed=%v, want %v", removed, test.wantRemove)
+			}
+		})
+	}
+}
+
 func TestDockerRunArgumentsAreRestrictedAndUseNoHostMounts(t *testing.T) {
 	name := "imperative-go-assessment-00112233445566778899aabb"
 	args := dockerRunArgs(name, "runner:image")
 	for _, required := range []string{
-		"--rm", "--interactive", "none", "--read-only", "ALL",
-		"no-new-privileges", "256m", "nofile=128:128", "65532:65532",
-		"CGO_ENABLED=0", "GOPROXY=off", "runner:image",
+		"--rm", "--interactive", "--pull", "never", "--network", "none",
+		"--ipc", "--read-only", "ALL", "no-new-privileges", "--log-driver",
+		"256m", "nofile=128:128", "core=0:0", "65532:65532",
+		"CGO_ENABLED=0", "GOPROXY=off", "GOTELEMETRY=off",
+		dockerContainerLabel, "runner:image",
 	} {
 		if !slices.Contains(args, required) {
 			t.Errorf("missing restricted argument %q in %v", required, args)
@@ -206,6 +276,28 @@ func TestContainerNamesAreUniqueAndValidated(t *testing.T) {
 	}
 	if _, err := newContainerName(strings.NewReader("short")); err == nil {
 		t.Fatal("expected entropy read failure")
+	}
+}
+
+func TestDockerBuildHasNoNetworkAndUsesRestrictedContext(t *testing.T) {
+	args := dockerBuildArgs(`C:\project`, "runner:image")
+	if !slices.Contains(args, "--network") || !slices.Contains(args, "none") {
+		t.Fatalf("Docker build must disable RUN-step networking: %v", args)
+	}
+	ignore, err := os.ReadFile(filepath.Join("..", "..", ".dockerignore"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, allowed := range []string{
+		"**",
+		"!go.mod",
+		"!docker/runner.Dockerfile",
+		"!cmd/sandbox-runner/*.go",
+		"!internal/sandboxprotocol/*.go",
+	} {
+		if !strings.Contains(string(ignore), allowed) {
+			t.Errorf(".dockerignore does not enforce allowlist rule %q", allowed)
+		}
 	}
 }
 
