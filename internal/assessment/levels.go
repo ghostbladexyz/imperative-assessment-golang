@@ -109,7 +109,13 @@ func levelTwo() Level {
 		"A partial implementation supplies WordCount and a TODO function.",
 	)
 	instructions.Constraints = []string{"Preserve first-seen order.", "Trim with strings.TrimSpace.", "Case-sensitive keys.", "Return []WordCount{} for no meaningful values."}
-	instructions.Examples = []Example{{Input: `[" red ","blue","red"]`, Output: `[{"word":"red","count":2},{"word":"blue","count":1}]`}, {Input: `["","  ","Go","go"]`, Output: `[{"word":"Go","count":1},{"word":"go","count":1}]`}}
+	instructions.Examples = []Example{
+		{Input: `TallyWords([]string{" red ","blue","red"})`, Output: `[]WordCount{{Word:"red",Count:2},{Word:"blue",Count:1}}`},
+		{Input: `TallyWords([]string{"","  ","Go","go"})`, Output: `[]WordCount{{Word:"Go",Count:1},{Word:"go",Count:1}}`},
+		{Input: `TallyWords([]string{"b","a","b","c","a"})`, Output: `[]WordCount{{Word:"b",Count:2},{Word:"a",Count:2},{Word:"c",Count:1}}`},
+		{Input: `TallyWords(nil)`, Output: `[]WordCount{}`},
+	}
+	setSourcePolicy(&instructions, []string{"append", "len", "make"}, []string{"fmt", "strings"})
 	instructions.Documentation = []DocumentationLink{{Label: "Maps", URL: "https://go.dev/blog/maps"}, {Label: "strings.TrimSpace", URL: "https://pkg.go.dev/strings#TrimSpace"}}
 	instructions.Hints = []string{"A map can remember where a word lives in the result slice.", "Append only on first sight; otherwise increment the existing element.", "Initialize the result with make([]WordCount, 0) so empty input is not nil."}
 	instructions.CommonPitfalls = []string{"Iterating over the map for output", "Counting blank strings", "Normalizing case when the contract says not to"}
