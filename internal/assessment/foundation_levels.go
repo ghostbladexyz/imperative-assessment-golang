@@ -510,7 +510,8 @@ func makePracticeLevel(spec practiceSpec) Level {
 	instructions.Hints = append([]string(nil), spec.hints...)
 	instructions.CommonPitfalls = append([]string(nil), spec.pitfalls...)
 	instructions.Examples = make([]Example, 0, 4)
-	for _, current := range spec.cases[:4] {
+	for index := 0; index < 4; index++ {
+		current := spec.cases[index%len(spec.cases)]
 		instructions.Examples = append(instructions.Examples, Example{
 			Input:  functionName(spec.signature) + "(" + current.input + ")",
 			Output: current.expected,
