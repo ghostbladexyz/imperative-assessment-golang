@@ -2410,6 +2410,24 @@ details[open] > summary svg:last-child {
     grid-template-columns: 1fr;
   }
 
+  .instruction-summary {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 9px;
+  }
+
+  .instruction-summary > code,
+  .brief-action {
+    grid-column: 1;
+  }
+
+  .instruction-summary > code {
+    grid-row: 2;
+  }
+
+  .brief-action {
+    grid-row: 3;
+  }
+
   .info-block + .info-block,
   .instruction-disclosures details + details {
     border-top: 1px solid var(--line);
