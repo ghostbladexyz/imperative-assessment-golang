@@ -426,7 +426,13 @@ func levelSix() Level {
 		"The signature and a TODO are supplied.",
 	)
 	instructions.Constraints = []string{"Expected O(n log n) time or O(n) average time.", "Do not mutate the caller's input.", "Pairs are unique by value, not index.", "Return [][2]int{} when there are no pairs."}
-	instructions.Examples = []Example{{Input: `[3,1,2,2,4], target 5`, Output: `[[1,4],[2,3]]`}, {Input: `[2,2,2], target 4`, Output: `[[2,2]]`}}
+	instructions.Examples = []Example{
+		{Input: `PairSums([]int{3,1,2,2,4}, 5)`, Output: `[][2]int{{1,4},{2,3}}`},
+		{Input: `PairSums([]int{2,2,2}, 4)`, Output: `[][2]int{{2,2}}`},
+		{Input: `PairSums([]int{-2,2,-1,1,0,0}, 0)`, Output: `[][2]int{{-2,2},{-1,1},{0,0}}`},
+		{Input: `PairSums([]int{1,2,3}, 99)`, Output: `[][2]int{}`},
+	}
+	setSourcePolicy(&instructions, []string{"append", "copy", "len", "make"}, []string{"fmt", "sort"})
 	instructions.Documentation = []DocumentationLink{{Label: "sort.Ints", URL: "https://pkg.go.dev/sort#Ints"}, {Label: "Go slices", URL: "https://go.dev/blog/slices-intro"}}
 	instructions.Hints = []string{"Copy and sort the input, then use a left and right pointer.", "When you find a pair, skip every duplicate of both values.", "A pair using the same value requires at least two occurrences, which two pointers naturally enforce."}
 	instructions.CommonPitfalls = []string{"Returning duplicate pairs", "Mutating values while sorting", "Returning pairs in discovery order"}
