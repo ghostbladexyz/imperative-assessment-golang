@@ -129,7 +129,7 @@ export interface Settings {
 }
 
 export interface SavedProgress {
-  schemaVersion: 2;
+  schemaVersion: 4;
   updatedAt: number;
   currentLevelId: number;
   levels: Record<string, LevelProgress>;
