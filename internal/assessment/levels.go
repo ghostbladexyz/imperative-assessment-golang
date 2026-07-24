@@ -251,7 +251,13 @@ func levelFour() Level {
 		"Structs are supplied and the transformation starts with a TODO.",
 	)
 	instructions.Constraints = []string{"Exactly three comma-separated fields.", "Trim every field.", "SKU must be non-empty; quantity and price must be non-negative integers.", "Sort by SKU.", "Scanner errors must be returned."}
-	instructions.Examples = []Example{{Input: `"tea,2,150\ntea,1,150"`, Output: `[{"sku":"tea","quantity":3,"revenueCents":450}]`}, {Input: `"# note\n\npen,4,25"`, Output: `[{"sku":"pen","quantity":4,"revenueCents":100}]`}}
+	instructions.Examples = []Example{
+		{Input: `SummarizeInventory(strings.NewReader("tea,2,150\ntea,1,150"))`, Output: `[]ItemTotal{{SKU:"tea",Quantity:3,RevenueCents:450}}`},
+		{Input: `SummarizeInventory(strings.NewReader("# note\n\npen,4,25"))`, Output: `[]ItemTotal{{SKU:"pen",Quantity:4,RevenueCents:100}}`},
+		{Input: `SummarizeInventory(strings.NewReader("z,1,5\na,2,10"))`, Output: `[]ItemTotal{{SKU:"a",Quantity:2,RevenueCents:20},{SKU:"z",Quantity:1,RevenueCents:5}}`},
+		{Input: `SummarizeInventory(strings.NewReader("bad,record"))`, Output: `nil, non-nil error`},
+	}
+	setSourcePolicy(&instructions, []string{"append", "len", "make"}, []string{"bufio", "fmt", "io", "sort", "strconv", "strings"})
 	instructions.Documentation = []DocumentationLink{{Label: "bufio.Scanner", URL: "https://pkg.go.dev/bufio#Scanner"}, {Label: "sort.Slice", URL: "https://pkg.go.dev/sort#Slice"}, {Label: "io.Reader", URL: "https://pkg.go.dev/io#Reader"}}
 	instructions.Hints = []string{"Scan one line at a time and keep a map keyed by SKU.", "Store a struct back into the map after updating it.", "After scanning, copy map values into a slice and sort it."}
 	instructions.CommonPitfalls = []string{"Forgetting Scanner.Err", "Multiplying after totals have already been aggregated", "Returning map iteration order"}
