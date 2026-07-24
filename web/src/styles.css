@@ -2462,7 +2462,7 @@ details[open] > summary svg:last-child {
   }
 
   .results-panel {
-    max-height: 680px;
+    max-height: none;
   }
 
   .test-dock {
