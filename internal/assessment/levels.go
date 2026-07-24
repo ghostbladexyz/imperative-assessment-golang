@@ -175,7 +175,14 @@ func levelThree() Level {
 		"Imports and the sentinel error are supplied; the parser is unfinished.",
 	)
 	instructions.Constraints = []string{"Trim surrounding whitespace.", "Reject signs, decimals, embedded whitespace, zero, and values above 65535.", "Wrap or return ErrInvalidPort.", "Do not panic."}
-	instructions.Examples = []Example{{Input: `" 8080 "`, Output: `8080, nil`}, {Input: `"0"`, Output: `0, error matching ErrInvalidPort`}}
+	instructions.Examples = []Example{
+		{Input: `ParsePort(" 8080 ")`, Output: `8080, nil`},
+		{Input: `ParsePort("1")`, Output: `1, nil`},
+		{Input: `ParsePort("0")`, Output: `0, error matching ErrInvalidPort`},
+		{Input: `ParsePort("+80")`, Output: `0, error matching ErrInvalidPort`},
+		{Input: `ParsePort("65536")`, Output: `0, error matching ErrInvalidPort`},
+	}
+	setSourcePolicy(&instructions, []string{"len"}, []string{"errors", "fmt", "strconv", "strings"})
 	instructions.Documentation = []DocumentationLink{{Label: "strconv.Atoi", URL: "https://pkg.go.dev/strconv#Atoi"}, {Label: "errors.Is", URL: "https://pkg.go.dev/errors#Is"}, {Label: "fmt.Errorf wrapping", URL: "https://pkg.go.dev/fmt#Errorf"}}
 	instructions.Hints = []string{"Trim before checking the text.", "Check every remaining byte is between '0' and '9' before Atoi.", "Use fmt.Errorf(\"...: %w\", ErrInvalidPort) if you want context while preserving errors.Is."}
 	instructions.CommonPitfalls = []string{"Letting strconv accept +80", "Accepting port zero", "Returning an unrelated parse error"}
