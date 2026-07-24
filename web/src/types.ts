@@ -1,4 +1,14 @@
 export type Theme = "light" | "dark";
+export type RunnerMode = "docker" | "local";
+
+export interface RunnerConfig {
+  ok: boolean;
+  runnerMode: RunnerMode;
+  sandboxReady: boolean;
+  goVersion: string;
+  dockerImage?: string;
+  message: string;
+}
 
 export interface DocumentationLink {
   label: string;
@@ -68,6 +78,7 @@ export interface RunResult {
   totalCount: number;
   compileError?: string;
   runtimeError?: string;
+  failureKind?: "capacity" | "cleanup" | "internal" | "output" | "startup";
   timedOut: boolean;
   stopped: boolean;
   stdout: string;
@@ -124,4 +135,3 @@ export interface SavedProgress {
   timer: TimerState;
   settings: Settings;
 }
-
