@@ -1,0 +1,10 @@
+.data/
+.assessment-tmp/
+coverage/
+node_modules/
+web/node_modules/
+*.exe
+*.test
+*.out
+.DS_Store
+
