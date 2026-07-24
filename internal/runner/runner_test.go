@@ -64,6 +64,40 @@ func TestRunnerReportsCompilerErrors(t *testing.T) {
 	}
 }
 
+func TestRunnerExplainsGoDebugOutputAfterConsoleLogError(t *testing.T) {
+	level, _ := assessment.FindLevel(1)
+	result := New("go", 1, nil).Run(
+		context.Background(),
+		level,
+		`func NormalizeTokens(input string) []string {
+			console.log(input)
+			return input
+		}`,
+		[]string{"l1-word"},
+	)
+	if !strings.Contains(result.CompileError, "Go has no console.log") ||
+		!strings.Contains(result.CompileError, "fmt.Println") {
+		t.Fatalf("expected Go-specific debug guidance, got %q", result.CompileError)
+	}
+}
+
+func TestRunnerCapturesStudentStandardOutput(t *testing.T) {
+	level, _ := assessment.FindLevel(1)
+	result := New("go", 1, nil).Run(
+		context.Background(),
+		level,
+		`import "fmt"
+		func NormalizeTokens(input string) []string {
+			fmt.Println("debug:", input)
+			return []string{}
+		}`,
+		[]string{"l1-symbols"},
+	)
+	if !strings.Contains(result.Stdout, "debug: ---___...") {
+		t.Fatalf("expected student stdout, got %#v", result)
+	}
+}
+
 func TestRunnerTerminatesTimeout(t *testing.T) {
 	level, _ := assessment.FindLevel(1)
 	result := New("go", 1, nil).Run(
