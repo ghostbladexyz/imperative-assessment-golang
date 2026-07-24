@@ -1200,7 +1200,7 @@ details[open] > summary svg:last-child {
 }
 
 .results-panel {
-  max-height: 624px;
+  max-height: none;
   display: flex;
   flex-direction: column;
 }
