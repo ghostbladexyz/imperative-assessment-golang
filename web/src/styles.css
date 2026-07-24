@@ -2216,7 +2216,7 @@ details[open] > summary svg:last-child {
   }
 
   .results-panel {
-    max-height: 620px;
+    max-height: none;
   }
 }
 
