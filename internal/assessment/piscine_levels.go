@@ -9,8 +9,9 @@ import (
 // Duplicate solution variants and exercises already represented elsewhere in
 // the curriculum are intentionally omitted.
 func piscineLevels() []Level {
-	specs := make([]practiceSpec, 0, 18)
+	specs := make([]practiceSpec, 0, 32)
 specs = append(specs, piscineQuestTwoSpecs()...)
+specs = append(specs, piscineQuestThreeAndFourSpecs()...)
 
 	levels := make([]Level, 0, len(specs))
 	for _, spec := range specs {
@@ -103,6 +104,114 @@ func piscineQuestTwoSpecs() []practiceSpec {
 			"Generate the reverse alphabet with alternating case.", "No input.", "zYxW...bA followed by newline.",
 			nil, noFields, "DisplayAlphaReverseM()", `""`,
 			[]practiceCase{pc("Reverse alternating alphabet", ``, jsonString("zYxWvUtSrQpOnMlKjIhGfEdCbA\n"), map[string]any{})}),
+	}
+}
+
+func piscineQuestThreeAndFourSpecs() []practiceSpec {
+	return []practiceSpec{
+		piscineSpec(1019, "Basic Atoi", "Piscine Quest 3", "BasicAtoi(value string) int",
+			"Convert a digit-only string to an integer.", "A non-empty string of decimal digits.", "Its integer value.",
+			nil, stringField, "BasicAtoi(current.Payload.Value)", `0`,
+			intStringCases([]string{"0", "7", "12345", "00042"}, []int{0, 7, 12345, 42})),
+		piscineSpec(1020, "Validated Basic Atoi", "Piscine Quest 3", "BasicAtoi2(value string) int",
+			"Convert decimal digits and reject any other character.", "One string.", "Its value, or 0 when any character is not a digit.",
+			nil, stringField, "BasicAtoi2(current.Payload.Value)", `0`,
+			intStringCases([]string{"", "12345", "00042", "12 3", "hello"}, []int{0, 12345, 42, 0, 0})),
+		piscineSpec(1021, "ASCII To Integer", "Piscine Quest 3", "Atoi(value string) int",
+			"Parse an optional leading sign and decimal digits.", "One string.", "The signed integer, or 0 for invalid syntax.",
+			[]string{"len"}, stringField, "Atoi(current.Payload.Value)", `0`,
+			intStringCases([]string{"0", "12345", "-1234", "+1234", "++1", "12 3"}, []int{0, 12345, -1234, 1234, 0, 0})),
+		piscineSpec(1022, "Point One", "Piscine Quest 3", "PointOne(value *int) int",
+			"Set an integer through a pointer.", "A pointer to an integer.", "Set the pointed value to 1 and return it.",
+			nil, intField, "func() int { value := current.Payload.Value; return PointOne(&value) }()", `0`,
+			[]practiceCase{
+				intCase("Zero", 0, 1),
+				intCase("Positive", 7, 1),
+				intCase("Negative", -7, 1),
+			}),
+		piscineSpec(1023, "Swap", "Piscine Quest 3", "Swap(left *int, right *int) []int",
+			"Swap two integers through pointers.", "Pointers to two integers.", "A two-item slice containing the swapped values.",
+			nil, twoIntsFields, "func() []int { left, right := current.Payload.Left, current.Payload.Right; return Swap(&left, &right) }()", `nil`,
+			[]practiceCase{
+				twoIntsSliceCase("Different", 1, 2, []int{2, 1}),
+				twoIntsSliceCase("Equal", 5, 5, []int{5, 5}),
+				twoIntsSliceCase("Signs", -1, 2, []int{2, -1}),
+			}),
+		piscineSpec(1024, "Division And Modulo", "Piscine Quest 3", "DivMod(left int, right int) []int",
+			"Calculate integer quotient and remainder.", "Two integers with a non-zero divisor.", "A two-item slice containing quotient and remainder.",
+			nil, twoIntsFields, "DivMod(current.Payload.Left, current.Payload.Right)", `nil`,
+			[]practiceCase{
+				twoIntsSliceCase("Exact", 10, 2, []int{5, 0}),
+				twoIntsSliceCase("Remainder", 13, 5, []int{2, 3}),
+				twoIntsSliceCase("Negative", -13, 5, []int{-2, -3}),
+			}),
+		piscineSpec(1025, "Ultimate Division And Modulo", "Piscine Quest 3", "UltimateDivMod(left int, right int) []int",
+			"Replace two values with their quotient and remainder.", "Two integers with a non-zero divisor.", "A two-item slice containing the resulting values.",
+			nil, twoIntsFields, "UltimateDivMod(current.Payload.Left, current.Payload.Right)", `nil`,
+			[]practiceCase{
+				twoIntsSliceCase("Exact", 10, 2, []int{5, 0}),
+				twoIntsSliceCase("Remainder", 13, 5, []int{2, 3}),
+				twoIntsSliceCase("Negative", -13, 5, []int{-2, -3}),
+			}),
+		piscineSpec(1026, "Ultimate Point One", "Piscine Quest 3", "UltimatePointOne(value *int) int",
+			"Reach an integer through three pointer levels and set it to 1.", "A pointer to an integer; create the extra pointer levels inside the function.", "Set and return 1.",
+			nil, intField, "func() int { value := current.Payload.Value; return UltimatePointOne(&value) }()", `0`,
+			[]practiceCase{
+				intCase("Zero", 0, 1),
+				intCase("Positive", 42, 1),
+				intCase("Negative", -42, 1),
+			}),
+		piscineSpec(1027, "Sort Integer Table", "Piscine Quest 3", "SortIntegerTable(values []int) []int",
+			"Sort integers in ascending order without using sort.", "One integer slice.", "A sorted slice containing the same values.",
+			[]string{"len"}, intsField, "SortIntegerTable(current.Payload.Values)", `nil`,
+			[]practiceCase{
+				intSliceCase("Empty", []int{}, []int{}),
+				intSliceCase("Sorted", []int{1, 2, 3}, []int{1, 2, 3}),
+				intSliceCase("Reverse", []int{3, 2, 1}, []int{1, 2, 3}),
+				intSliceCase("Duplicates", []int{2, 1, 2}, []int{1, 2, 2}),
+			}),
+		piscineSpec(1028, "Rune Length", "Piscine Quest 3", "StrLen(value string) int",
+			"Count runes rather than UTF-8 bytes.", "One UTF-8 string.", "The number of Unicode code points.",
+			nil, stringField, "StrLen(current.Payload.Value)", `0`,
+			intStringCases([]string{"", "go", "?", "??", "caf‚"}, []int{0, 2, 1, 1, 4})),
+		piscineSpec(1029, "Prime Check", "Piscine Quest 4", "IsPrime(value int) bool",
+			"Determine whether an integer is prime.", "One integer.", "true only for prime values greater than 1.",
+			nil, intField, "IsPrime(current.Payload.Value)", `false`,
+			[]practiceCase{
+				intBoolCase("Negative", -3, false),
+				intBoolCase("One", 1, false),
+				intBoolCase("Two", 2, true),
+				intBoolCase("Composite", 9, false),
+				intBoolCase("Prime", 97, true),
+			}),
+		piscineSpec(1030, "Find Next Prime", "Piscine Quest 4", "FindNextPrime(value int) int",
+			"Find the smallest prime greater than or equal to an integer.", "One integer.", "The nearest prime at or above the input.",
+			nil, intField, "FindNextPrime(current.Payload.Value)", `0`,
+			[]practiceCase{
+				intCase("Below primes", -3, 2),
+				intCase("Prime", 5, 5),
+				intCase("Composite", 8, 11),
+				intCase("Large", 100, 101),
+			}),
+		piscineSpec(1031, "Power Of Two", "Piscine Quest 4", "IsPowerOfTwo(value int) bool",
+			"Check whether a positive integer is an exact power of two.", "One integer.", "true for 1, 2, 4, 8, ... and false otherwise.",
+			nil, intField, "IsPowerOfTwo(current.Payload.Value)", `false`,
+			[]practiceCase{
+				intBoolCase("Zero", 0, false),
+				intBoolCase("One", 1, true),
+				intBoolCase("Power", 64, true),
+				intBoolCase("Between", 63, false),
+				intBoolCase("Negative", -2, false),
+			}),
+		piscineSpec(1032, "Collatz Countdown", "Piscine Quest 4", "CollatzCountdown(value int) int",
+			"Count how many Collatz steps are needed to reach 1.", "A positive integer.", "The number of transformations, or -1 for non-positive input.",
+			nil, intField, "CollatzCountdown(current.Payload.Value)", `0`,
+			[]practiceCase{
+				intCase("Invalid", 0, -1),
+				intCase("Already one", 1, 0),
+				intCase("Even", 2, 1),
+				intCase("Sequence", 12, 9),
+			}),
 	}
 }
 
