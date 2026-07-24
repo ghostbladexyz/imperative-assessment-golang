@@ -127,11 +127,13 @@ function App() {
   const [showHistory, setShowHistory] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [mobileRail, setMobileRail] = useState(false);
+  const [editorFullscreen, setEditorFullscreen] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const controllerRef = useRef<AbortController | null>(null);
   const runVersionRef = useRef(0);
   const lastAutoRevisionRef = useRef(0);
   const importRef = useRef<HTMLInputElement>(null);
+  const editorPanelRef = useRef<HTMLDivElement>(null);
   const toastIDRef = useRef(0);
 
   const toast = useCallback(
@@ -1388,11 +1390,7 @@ function ResultsPanel({
           {result.timedOut ? <em>timeout</em> : null}
         </div>
       )}
-      {(result?.compileError || result?.runtimeError) && (
-        <pre className="error-console">
-          {result.compileError ?? result.runtimeError}
-        </pre>
-      )}
+      <ConsolePanel result={result} running={running} />
       <div className="test-list">
         {level.tests.map((test) => (
           <TestCase
