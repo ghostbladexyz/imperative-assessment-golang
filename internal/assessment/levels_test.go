@@ -14,8 +14,12 @@ func TestDefinitionsAreComplete(t *testing.T) {
 		if len(level.Instructions.Hints) < 3 {
 			t.Fatalf("level %d has fewer than three hints", level.ID)
 		}
-		if len(level.Instructions.Examples) < 2 {
-			t.Fatalf("level %d has fewer than two examples", level.ID)
+		if len(level.Instructions.Examples) < 4 {
+			t.Fatalf("level %d has fewer than four examples", level.ID)
+		}
+		if len(level.Instructions.AllowedBuiltins) == 0 ||
+			len(level.Instructions.AllowedPackages) == 0 {
+			t.Fatalf("level %d has no explicit source policy", level.ID)
 		}
 		if harness := level.BuildHarness(level.Tests[:1]); harness == "" {
 			t.Fatalf("level %d generated an empty harness", level.ID)
