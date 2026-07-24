@@ -6,10 +6,12 @@ problems and progresses through checkpoint-style challenges. Submitted code
 runs in a restricted Docker container by default.
 
 This is an unofficial practice tool and is not affiliated with Zone01.
-Exercises 22–65 adapt the public
+Exercises after the 21-level foundation adapt the public
 [Go checkpoint catalogue](https://github.com/software-sappho/.go-checkpoints-solutions/tree/main)
-using the canonical [01-edu subjects](https://github.com/01-edu/public/tree/master/subjects)
-for their contracts and examples.
+and [Zone01 piscine catalogue](https://github.com/kinoz01/zone01-Piscine).
+Duplicate and alternate-solution files are omitted, and the canonical
+[01-edu subjects](https://github.com/01-edu/public/tree/master/subjects) define
+the contracts and examples.
 
 ## Requirements
 
