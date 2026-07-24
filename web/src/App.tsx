@@ -26,7 +26,9 @@ import {
   Lightbulb,
   ListChecks,
   LockKeyhole,
+  Maximize2,
   Menu,
+  Minimize2,
   Minus,
   Moon,
   Pause,
@@ -40,6 +42,7 @@ import {
   Square,
   Sun,
   Trophy,
+  Terminal,
   Upload,
   X,
 } from "lucide-react";
@@ -192,6 +195,15 @@ function App() {
     }, 180);
     return () => window.clearTimeout(handle);
   }, [progress]);
+
+  useEffect(() => {
+    const syncFullscreenState = () => {
+      setEditorFullscreen(document.fullscreenElement === editorPanelRef.current);
+    };
+    document.addEventListener("fullscreenchange", syncFullscreenState);
+    return () =>
+      document.removeEventListener("fullscreenchange", syncFullscreenState);
+  }, []);
 
   useEffect(() => {
     if (!progress?.timer.running) return;
@@ -564,6 +576,18 @@ function App() {
     }
   };
 
+  const toggleEditorFullscreen = async () => {
+    try {
+      if (document.fullscreenElement === editorPanelRef.current) {
+        await document.exitFullscreen();
+      } else {
+        await editorPanelRef.current?.requestFullscreen();
+      }
+    } catch {
+      toast("This browser did not allow fullscreen mode.", "bad");
+    }
+  };
+
   if (loadingError) {
     return (
       <main className="fatal-state">
@@ -768,13 +792,8 @@ function App() {
               onUseHint={useHint}
             />
 
-            <section
-              className="workbench"
-              style={{
-                gridTemplateColumns: `${progress.settings.panelRatio}fr 8px ${100 - progress.settings.panelRatio}fr`,
-              }}
-            >
-              <div className="editor-panel panel">
+            <section className="workbench">
+              <div className="editor-panel panel" ref={editorPanelRef}>
                 <div className="panel-toolbar">
                   <div className="panel-title">
                     <span className="status-dot" />
@@ -830,36 +849,38 @@ function App() {
                   <code>package main</code>
                   <em>protected</em>
                 </div>
-                <CodeMirror
-                  value={currentLevelProgress.code}
-                  onChange={updateCode}
-                  extensions={[go(), EditorView.lineWrapping]}
-                  theme={progress.settings.theme}
-                  basicSetup={{
-                    lineNumbers: true,
-                    highlightActiveLineGutter: true,
-                    foldGutter: true,
-                    allowMultipleSelections: true,
-                    indentOnInput: true,
-                    bracketMatching: true,
-                    closeBrackets: true,
-                    autocompletion: true,
-                    rectangularSelection: true,
-                    crosshairCursor: false,
-                    highlightActiveLine: true,
-                    highlightSelectionMatches: true,
-                    closeBracketsKeymap: true,
-                    defaultKeymap: true,
-                    searchKeymap: true,
-                    historyKeymap: true,
-                    foldKeymap: true,
-                    completionKeymap: true,
-                    lintKeymap: true,
-                  }}
-                  height="510px"
-                  style={{ fontSize: progress.settings.fontSize }}
-                  aria-label={`Go editor for level ${currentLevel.id}`}
-                />
+                <div className="editor-canvas">
+                  <CodeMirror
+                    value={currentLevelProgress.code}
+                    onChange={updateCode}
+                    extensions={[go()]}
+                    theme={progress.settings.theme}
+                    basicSetup={{
+                      lineNumbers: true,
+                      highlightActiveLineGutter: true,
+                      foldGutter: true,
+                      allowMultipleSelections: true,
+                      indentOnInput: true,
+                      bracketMatching: true,
+                      closeBrackets: true,
+                      autocompletion: true,
+                      rectangularSelection: true,
+                      crosshairCursor: false,
+                      highlightActiveLine: true,
+                      highlightSelectionMatches: true,
+                      closeBracketsKeymap: true,
+                      defaultKeymap: true,
+                      searchKeymap: true,
+                      historyKeymap: true,
+                      foldKeymap: true,
+                      completionKeymap: true,
+                      lintKeymap: true,
+                    }}
+                    height="100%"
+                    style={{ fontSize: progress.settings.fontSize }}
+                    aria-label={`Go editor for level ${currentLevel.id}`}
+                  />
+                </div>
                 <div className="editor-footer">
                   <span>package main is injected and repaired before every run.</span>
                   <div className="font-controls" aria-label="Editor font size">
@@ -1207,22 +1228,39 @@ function InstructionsPanel({
           </p>
           <div className="rules-columns">
             <div>
-              <h4>Allowed</h4>
+              <h4>Allowed Go built-ins</h4>
+              <code className="allowlist">
+                {level.instructions.allowedBuiltins.join(", ")}
+              </code>
+              <h4>Allowed standard-library packages</h4>
+              <code className="allowlist">
+                {level.instructions.allowedPackages.join(", ")}
+              </code>
+            </div>
+            <div>
+              <h4>Also allowed</h4>
               <ul>
                 {level.instructions.allowed.map((item) => (
                   <li key={item}>{item}</li>
                 ))}
               </ul>
             </div>
-            <div>
-              <h4>Disallowed</h4>
-              <ul>
-                {level.instructions.disallowed.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
           </div>
+          <h4>Disallowed</h4>
+          <ul>
+            {level.instructions.disallowed.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+          <p className="console-note">
+            <Terminal />
+            <span>
+              <strong>Debug output:</strong> use <code>fmt.Println(...)</code>,{" "}
+              <code>print(...)</code>, or <code>println(...)</code>.{" "}
+              <code>console.log</code> belongs to JavaScript and is not valid Go.
+              Output appears in the Console after the program compiles.
+            </span>
+          </p>
           <h4>Official Go references</h4>
           <div className="doc-links">
             {level.instructions.documentation.map((link) => (
@@ -1232,42 +1270,42 @@ function InstructionsPanel({
             ))}
           </div>
         </div>
-      </details>
-      <div className="instruction-disclosures">
-        <details>
-          <summary>
-            <AlertTriangle /> Common pitfalls <ChevronDown />
-          </summary>
-          <ul>
-            {level.instructions.commonPitfalls.map((pitfall) => (
-              <li key={pitfall}>{pitfall}</li>
-            ))}
-          </ul>
-        </details>
-        <details>
-          <summary>
-            <Lightbulb /> Hints ({hintsUsed.length}/
-            {level.instructions.hints.length} opened) <ChevronDown />
-          </summary>
-          <ol className="hints-list">
-            {level.instructions.hints.map((hint, index) => {
-              const used = hintsUsed.includes(index);
-              return (
-                <li key={hint}>
-                  {used ? (
-                    <p>{hint}</p>
-                  ) : (
-                    <button onClick={() => onUseHint(index)}>
-                      Reveal hint {index + 1}
-                    </button>
-                  )}
-                </li>
-              );
-            })}
-          </ol>
-        </details>
+        <div className="instruction-disclosures">
+          <details>
+            <summary>
+              <AlertTriangle /> Common pitfalls <ChevronDown />
+            </summary>
+            <ul>
+              {level.instructions.commonPitfalls.map((pitfall) => (
+                <li key={pitfall}>{pitfall}</li>
+              ))}
+            </ul>
+          </details>
+          <details>
+            <summary>
+              <Lightbulb /> Hints ({hintsUsed.length}/
+              {level.instructions.hints.length} opened) <ChevronDown />
+            </summary>
+            <ol className="hints-list">
+              {level.instructions.hints.map((hint, index) => {
+                const used = hintsUsed.includes(index);
+                return (
+                  <li key={hint}>
+                    {used ? (
+                      <p>{hint}</p>
+                    ) : (
+                      <button onClick={() => onUseHint(index)}>
+                        Reveal hint {index + 1}
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+          </details>
+        </div>
       </div>
-    </section>
+    </details>
   );
 }
 
