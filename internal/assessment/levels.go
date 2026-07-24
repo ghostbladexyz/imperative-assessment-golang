@@ -631,7 +631,14 @@ func levelEight() Level {
 		"Database-shaped interfaces and result structs are supplied. No database server or third-party driver is needed.",
 	)
 	instructions.Constraints = []string{"Query: SELECT id, name, total_cents FROM account_totals WHERE total_cents >= ? ORDER BY id", "Pass minCents as the sole argument; never interpolate it.", "defer rows.Close immediately after a successful query.", "Check rows.Err after iteration.", "Return []AccountTotal{} for zero rows."}
-	instructions.Examples = []Example{{Input: `minCents 500, rows (1,"Ada",900)`, Output: `[{"id":1,"name":"Ada","totalCents":900}]`}, {Input: `query returns error`, Output: `that error`}}
+	instructions.Examples = []Example{
+		{Input: `minCents 500, row (1,"Ada",900)`, Output: `[]AccountTotal{{ID:1,Name:"Ada",TotalCents:900}}, nil`},
+		{Input: `minCents 0, no rows`, Output: `[]AccountTotal{}, nil`},
+		{Input: `QueryContext returns queryErr`, Output: `nil, queryErr`},
+		{Input: `Scan returns scanErr`, Output: `nil, scanErr; rows are still closed`},
+		{Input: `Rows.Err returns rowsErr`, Output: `nil, rowsErr`},
+	}
+	setSourcePolicy(&instructions, []string{"append", "len", "make"}, []string{"context", "fmt"})
 	instructions.Documentation = []DocumentationLink{{Label: "database/sql querying", URL: "https://go.dev/doc/database/querying"}, {Label: "Rows.Next", URL: "https://pkg.go.dev/database/sql#Rows.Next"}, {Label: "Context", URL: "https://pkg.go.dev/context"}}
 	instructions.Hints = []string{"Call QueryContext with the constant query and minCents as a separate argument.", "Loop while rows.Next and scan into a fresh AccountTotal.", "Close with defer, then check rows.Err after the loop."}
 	instructions.CommonPitfalls = []string{"Formatting minCents into SQL", "Forgetting Close", "Ignoring Scan or Rows.Err errors"}
