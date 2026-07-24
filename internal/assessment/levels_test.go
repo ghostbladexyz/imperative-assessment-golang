@@ -42,34 +42,39 @@ func TestPublicLevelsDoNotExposeHarnesses(t *testing.T) {
 	}
 }
 
-func TestTokenTrailTeachesGoSliceSyntax(t *testing.T) {
+func TestZone01CatalogueRemainsComplete(t *testing.T) {
 	t.Parallel()
-	var level Level
-	for _, candidate := range Levels() {
-		if candidate.Title == "Token Trail" {
-			level = candidate
-			break
-		}
+	levels := Levels()
+	wantTitles := []string{
+		"Only A", "Print If Not", "Print If", "Rectangle Perimeter",
+		"Count Character", "Check Number", "Retain First Half", "Count Alpha",
+		"First Word", "Last Word", "Fish And Chips", "Digit Length",
+		"Search Replace", "Repeat Alpha", "Greatest Common Divisor",
+		"Camel To Snake Case", "Hash Code", "Third Time Is A Charm", "From To",
+		"Is Capitalized", "Find Previous Prime", "Integer To ASCII",
+		"Clean String", "Expand String", "We Are Unique", "Zip String",
+		"Print Reverse Combo", "Print Memory", "Concat Slice", "Save And Miss",
+		"Hidden P", "Word Match", "Intersection", "Union", "Concat Alternate",
+		"Chunk", "Reverse String Capitalization", "Can Jump", "Add Prime Sum",
+		"Prime Factors", "Fifth And Skip", "Reverse Concat Alternate",
+		"Not Decimal", "Slice",
 	}
-	if level.ID == 0 {
-		t.Fatal("Token Trail level is missing")
+	available := make(map[string]bool, len(levels))
+	for _, level := range levels {
+		available[level.Title] = true
 	}
-	if !strings.Contains(level.StarterCode, "result := []string{}") {
-		t.Fatal("Token Trail starter must demonstrate a valid empty string slice")
-	}
-	pitfalls := strings.Join(level.Instructions.CommonPitfalls, "\n")
-	for _, syntax := range []string{"[]string{}", "append(result, value)", "string(input[i])"} {
-		if !strings.Contains(pitfalls, syntax) {
-			t.Errorf("level 1 pitfalls do not explain %q", syntax)
+	for _, want := range wantTitles {
+		if !available[want] {
+			t.Errorf("missing Zone01 exercise %q", want)
 		}
 	}
 }
 
-func TestProgressionStartsSimpleAndContainsThirtyExercises(t *testing.T) {
+func TestProgressionStartsSimpleAndContainsFullCatalogue(t *testing.T) {
 	t.Parallel()
 	levels := Levels()
-	if len(levels) != 30 {
-		t.Fatalf("got %d exercises, want 30", len(levels))
+	if len(levels) != exerciseCount {
+		t.Fatalf("got %d exercises, want %d", len(levels), exerciseCount)
 	}
 	wantSignatures := []string{
 		"Echo(value string) string",
@@ -84,7 +89,38 @@ func TestProgressionStartsSimpleAndContainsThirtyExercises(t *testing.T) {
 			t.Errorf("exercise %d difficulty = %q, want Beginner", index+1, levels[index].Difficulty)
 		}
 	}
-	if levels[21].Title != "Token Trail" {
-		t.Fatalf("exercise 22 = %q, want Token Trail", levels[21].Title)
+	if levels[21].Title != "Only Z" {
+		t.Fatalf("exercise 22 = %q, want Only Z", levels[21].Title)
+	}
+}
+
+func TestImportedExercisesIncreaseInDifficulty(t *testing.T) {
+	t.Parallel()
+	levels := Levels()
+	previous := 0
+	for _, level := range levels[21:] {
+		current := importedDifficultyRank(level.Difficulty)
+		if current < previous {
+			t.Fatalf("%q (%s) appears after a harder exercise", level.Title, level.Difficulty)
+		}
+		previous = current
+	}
+}
+
+func TestCatalogueHasNoDuplicateTitles(t *testing.T) {
+	t.Parallel()
+	seen := make(map[string]int, exerciseCount)
+	for _, level := range Levels() {
+		if previous, found := seen[level.Title]; found {
+			t.Fatalf("duplicate title %q at exercises %d and %d", level.Title, previous, level.ID)
+		}
+		seen[level.Title] = level.ID
+	}
+}
+
+func TestKinoz01CatalogueAddsOneHundredAndSixUniqueExercises(t *testing.T) {
+	t.Parallel()
+	if got := len(piscineLevels()); got != 106 {
+		t.Fatalf("got %d kinoz01 exercises, want 106", got)
 	}
 }
