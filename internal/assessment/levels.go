@@ -2,6 +2,7 @@ package assessment
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -30,14 +31,43 @@ func test(id, name, purpose, input, expected string, payload any) VisibleTest {
 }
 
 func Levels() []Level {
-	levels := append(foundationalLevels(), piscineLevels()...)
-	levels = append(levels, zone01Levels()...)
+	levels := foundationalLevels()
+	imported := append(piscineLevels(), zone01Levels()...)
+	sort.SliceStable(imported, func(left, right int) bool {
+		return importedDifficultyRank(imported[left].Difficulty) < importedDifficultyRank(imported[right].Difficulty)
+	})
+	levels = append(levels, imported...)
 	for index := range levels {
 		levels[index].ID = index + 1
 		levels[index].StarterCode = "package main\n\n" + levels[index].StarterCode
 	}
 	return levels
 }
+
+func importedDifficultyRank(difficulty string) int {
+	ranks := map[string]int{
+		"Piscine Quest 2":  10,
+		"Checkpoint 5%":    15,
+		"Piscine Quest 3":  20,
+		"Checkpoint 10%":   25,
+		"Piscine Quest 4":  30,
+		"Piscine Quest 5":  35,
+		"Checkpoint 20%":   40,
+		"Piscine Quest 6":  45,
+		"Piscine Quest 7":  50,
+		"Checkpoint 35%":   55,
+		"Piscine Quest 8":  60,
+		"Piscine Quest 9":  65,
+		"Checkpoint 50%":   70,
+		"Piscine Advanced": 75,
+		"Checkpoint 65%":   80,
+	}
+	if rank, found := ranks[difficulty]; found {
+		return rank
+	}
+	return 1_000
+}
+
 func Validate() error {
 	levels := Levels()
 	if len(levels) != exerciseCount {
