@@ -28,6 +28,8 @@ export interface Instructions {
   constraints: string[];
   examples: Example[];
   documentation: DocumentationLink[];
+  allowedBuiltins: string[];
+  allowedPackages: string[];
   allowed: string[];
   disallowed: string[];
   starterNote: string;
