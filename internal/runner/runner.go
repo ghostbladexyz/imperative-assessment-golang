@@ -145,8 +145,7 @@ func FormatSource(source string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("%s", cleanCompilerError(err.Error()))
 	}
-	withoutPackage := packagePattern.ReplaceAllString(string(formatted), "")
-	return strings.TrimSpace(withoutPackage) + "\n", nil
+	return string(formatted), nil
 }
 
 func sourceHash(prepared string) string {
