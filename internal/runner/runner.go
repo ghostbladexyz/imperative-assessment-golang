@@ -176,6 +176,12 @@ func prepareRun(level assessment.Level, source string, testIDs []string, started
 	}
 	prepared := PrepareSource(source)
 	result.SourceHash = sourceHash(prepared)
+	if err := assessment.ValidateSourcePolicy(level, prepared); err != nil {
+		result.CompileError = err.Error()
+		markAll(result.Results, "compile", result.CompileError)
+		result.DurationMS = elapsedMS(started)
+		return result, selected, prepared, false
+	}
 	return result, selected, prepared, true
 }
 
