@@ -7,7 +7,7 @@ import (
 
 func TestSourcePolicyAcceptsDocumentedBuiltinsAndPackages(t *testing.T) {
 	t.Parallel()
-	level, _ := FindLevel(1)
+	level, _ := FindLevel(22)
 	source := `package main
 
 import "strings"
@@ -28,7 +28,7 @@ func NormalizeTokens(input string) []string {
 
 func TestSourcePolicyRejectsUnlistedBuiltin(t *testing.T) {
 	t.Parallel()
-	level, _ := FindLevel(1)
+	level, _ := FindLevel(22)
 	source := `package main
 func NormalizeTokens(input string) []string {
 	values := []string{input}
@@ -43,7 +43,7 @@ func NormalizeTokens(input string) []string {
 
 func TestSourcePolicyRejectsAliasedUnlistedBuiltin(t *testing.T) {
 	t.Parallel()
-	level, _ := FindLevel(1)
+	level, _ := FindLevel(22)
 	source := `package main
 func NormalizeTokens(input string) []string {
 	forbidden := copy
@@ -59,7 +59,7 @@ func NormalizeTokens(input string) []string {
 
 func TestSourcePolicyRejectsUnlistedPackage(t *testing.T) {
 	t.Parallel()
-	level, _ := FindLevel(1)
+	level, _ := FindLevel(22)
 	source := `package main
 import "regexp"
 func NormalizeTokens(input string) []string {
