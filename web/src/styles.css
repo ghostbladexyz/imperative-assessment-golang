@@ -175,6 +175,34 @@ button:disabled {
   white-space: nowrap;
 }
 
+.mode-badge {
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  padding: 3px 6px;
+  border: 1px solid currentColor;
+  font: 700 9px/1 var(--mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.mode-badge svg {
+  width: 12px;
+  height: 12px;
+}
+
+.mode-badge.docker {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.mode-badge.local {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
 .header-progress {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -2009,6 +2037,10 @@ details[open] > summary svg:last-child {
     display: none;
   }
 
+  .mode-badge {
+    margin-top: 4px;
+  }
+
   .timer-block {
     grid-column: 2;
   }
@@ -2109,6 +2141,11 @@ details[open] > summary svg:last-child {
     font-size: 14px;
     line-height: 1.05;
     white-space: normal;
+  }
+
+  .mode-badge {
+    font-size: 8px;
+    letter-spacing: 0;
   }
 
   .brand-block > div:last-child {
