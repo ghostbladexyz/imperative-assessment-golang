@@ -23,6 +23,7 @@ import (
 	"github.com/pleft/imperative-assessment-golang/internal/assessment"
 	"github.com/pleft/imperative-assessment-golang/internal/receipts"
 	"github.com/pleft/imperative-assessment-golang/internal/runner"
+	"github.com/pleft/imperative-assessment-golang/internal/updatecheck"
 	frontend "github.com/pleft/imperative-assessment-golang/internal/web"
 )
 
@@ -53,6 +54,7 @@ func main() {
 	address := flag.String("addr", "127.0.0.1:8080", "local address to listen on")
 	openBrowser := flag.Bool("open", false, "open the assessment in the default browser")
 	runnerMode := flag.String("runner", defaultRunnerMode, "execution runner: docker or local")
+	checkUpdates := flag.Bool("check-updates", true, "check GitHub for assessment updates")
 	flag.Parse()
 
 	if err := assessment.Validate(); err != nil {
@@ -69,6 +71,9 @@ func main() {
 	receiptManager, err := receipts.New(dataDir)
 	if err != nil {
 		log.Fatalf("initialize pass receipts: %v", err)
+	}
+	if *checkUpdates {
+		go logUpdateNotice(dataDir)
 	}
 	var executionRunner runner.Service
 	switch mode {
@@ -130,6 +135,21 @@ func main() {
 	}()
 	if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
+	}
+}
+
+// logUpdateNotice checks in the background so slow or unavailable networks never delay startup.
+func logUpdateNotice(dataDir string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	checker := updatecheck.New(
+		"ghostbladexyz",
+		"imperative-assessment-golang",
+		"main",
+		dataDir,
+	)
+	if notice := checker.Notice(ctx); notice != "" {
+		log.Printf("\n%s\n", notice)
 	}
 }
 

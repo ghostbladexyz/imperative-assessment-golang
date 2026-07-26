@@ -32,6 +32,11 @@ The first run builds the pinned sandbox image, starts the server, and opens
 its inputs remain unchanged. Keep the terminal open while using the app, and
 press `Ctrl+C` there to stop it.
 
+At startup, the application checks GitHub for newer commits and prints the
+appropriate `git pull` command when an update is available. The check has a
+short timeout, is cached for one hour, and never prevents startup. Disable it
+with `-check-updates=false`.
+
 Docker mode gives each submission a disposable container with no network,
 a read-only root filesystem, dropped capabilities, resource limits, and no host
 directory mounts. It is intended for local and classroom use; do not expose the
