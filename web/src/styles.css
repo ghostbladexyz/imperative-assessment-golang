@@ -805,31 +805,123 @@ body.resizing-output {
 
 .exercise-test-list {
   background: #0d1621;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.exercise-test-list.dragging-test {
+  scrollbar-color: transparent transparent;
+  scrollbar-width: none;
+}
+
+.exercise-test-list.dragging-test::-webkit-scrollbar {
+  display: none;
 }
 
 .exercise-test {
+  position: relative;
+  z-index: 0;
   padding: 10px 12px;
   border-bottom: 1px solid var(--line-soft);
+  transform: translate(0, 0);
+  transform-origin: center;
+  transition:
+    background-color 120ms ease,
+    box-shadow 140ms ease;
 }
 
-.exercise-test > div {
+.exercise-test.dragging {
+  z-index: 3;
+  opacity: 1;
+  background: #142233;
+  box-shadow:
+    0 12px 28px #00000073,
+    0 0 0 1px #61c3ff59,
+    inset 3px 0 var(--blue);
+  transform: translate(
+    var(--drag-x, 0),
+    calc(var(--drag-y, 0) - 3px)
+  );
+  transition:
+    background-color 120ms ease,
+    box-shadow 140ms ease;
+}
+
+.exercise-test > .test-title {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
 }
 
-.exercise-test > div span {
+.test-drag-handle {
+  display: grid;
+  flex: none;
+  width: 14px;
+  height: 22px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--faint);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.test-drag-handle:active {
+  cursor: grabbing;
+}
+
+.test-drag-handle:hover {
+  color: var(--blue);
+}
+
+.test-drag-handle svg {
+  width: 11px;
+  pointer-events: none;
+}
+
+.test-title > span {
   color: var(--blue);
   font: 8px/1 var(--mono);
 }
 
-.exercise-test strong {
+.test-title > strong {
+  min-width: 0;
+  flex: 1;
   color: #cbd8e5;
   font: 10px/1.25 var(--mono);
 }
 
+.test-order-controls {
+  display: flex;
+  gap: 2px;
+}
+
+.test-order-controls button {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  background: #101b28;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.test-order-controls button:not(:disabled):hover {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+.test-order-controls svg {
+  width: 11px;
+}
+
 .exercise-test p {
-  margin: 5px 0 8px 25px;
+  margin: 5px 0 8px 36px;
   color: var(--faint);
   font: 9px/1.4 var(--body);
 }
@@ -837,7 +929,7 @@ body.resizing-output {
 .exercise-test dl {
   display: grid;
   gap: 5px;
-  margin: 0 0 0 25px;
+  margin: 0 0 0 36px;
 }
 
 .exercise-test dl > div {

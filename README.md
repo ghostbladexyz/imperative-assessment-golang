@@ -55,6 +55,8 @@ It keeps the same execution and output limits but is not a sandbox.
   next exercise.
 - Use **Test** for feedback, **gofmt** to format the code, and **.go** to download
   the current editor contents.
+- Drag tests or use their arrow buttons to choose the order in which they run.
+  Program output from `fmt.Print*` appears in the console above test failures.
 - Progress and editor layout are saved in the browser on the current device.
 - Drag the panel dividers to resize the instructions, editor, tests, and console.
 

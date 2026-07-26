@@ -10,6 +10,13 @@ const tests: Level["tests"] = [
     input: '""',
     expected: '["hi"]',
   },
+  {
+    id: "one",
+    name: "One byte",
+    purpose: "Handles one byte.",
+    input: '"x"',
+    expected: "true",
+  },
 ];
 
 function run(overrides: Partial<RunResult>): RunResult {
@@ -58,7 +65,7 @@ describe("buildConsoleStreams", () => {
     ]);
   });
 
-  it("shows program output and only the first failed test", () => {
+  it("shows program output and a failed test", () => {
     const streams = buildConsoleStreams(
       run({
         stdout: "hello",
@@ -80,6 +87,40 @@ describe("buildConsoleStreams", () => {
       {
         label: "test #1 failed: Empty input",
         value: 'Need: ["hi"], Actual: []',
+        error: true,
+      },
+    ]);
+  });
+
+  it("shows only the first failed test", () => {
+    const streams = buildConsoleStreams(
+      run({
+        totalCount: 2,
+        results: [
+          {
+            ...tests[0],
+            actual: "false",
+            passed: false,
+            status: "assertion",
+            durationMs: 0,
+          },
+          {
+            ...tests[1],
+            actual: "",
+            passed: false,
+            status: "runtime",
+            failure: "panic: runtime error: index out of range [1] with length 1",
+            durationMs: 0,
+          },
+        ],
+      }),
+      tests,
+    );
+
+    expect(streams).toEqual([
+      {
+        label: "test #1 failed: Empty input",
+        value: 'Need: ["hi"], Actual: false',
         error: true,
       },
     ]);

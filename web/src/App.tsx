@@ -2,6 +2,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -11,11 +12,14 @@ import { go } from "@codemirror/lang-go";
 import {
   ArrowLeft,
   ArrowRight,
+  ArrowDown,
+  ArrowUp,
   Check,
   Copy,
   Download,
   Eye,
   EyeOff,
+  GripVertical,
   ListChecks,
   Maximize2,
   Minimize2,
@@ -33,6 +37,7 @@ import {
 } from "./api";
 import { buildConsoleStreams } from "./console";
 import { loadProgress, saveProgress } from "./storage";
+import { constrainDragTop, reorderTests } from "./test-order";
 import type { Level, RunResult, SavedProgress } from "./types";
 
 type PaneSizes = {
@@ -62,6 +67,7 @@ function App() {
   const [fullscreen, setFullscreen] = useState(false);
   const [paneSizes, setPaneSizes] = useState(loadPaneSizes);
   const [testsVisible, setTestsVisible] = useState(loadTestsVisibility);
+  const [testOrders, setTestOrders] = useState<Record<string, string[]>>({});
   const controllerRef = useRef<AbortController | null>(null);
   const runVersionRef = useRef(0);
   const lastAutoRevisionRef = useRef(0);
@@ -143,6 +149,31 @@ function App() {
   const levelProgress =
     progress && level ? progress.exercises[level.key] : undefined;
   const result = level ? runs[level.key] : undefined;
+  const orderedTests = useMemo(() => {
+    if (!level) return [];
+    const savedOrder = testOrders[level.key];
+    if (!savedOrder) return level.tests;
+    const byID = new Map(level.tests.map((test) => [test.id, test]));
+    const ordered = savedOrder.flatMap((id) => {
+      const test = byID.get(id);
+      if (!test) return [];
+      byID.delete(id);
+      return [test];
+    });
+    return [...ordered, ...byID.values()];
+  }, [level, testOrders]);
+
+  const moveTest = useCallback(
+    (movingID: string, targetID: string) => {
+      if (!level) return;
+      const reordered = reorderTests(orderedTests, movingID, targetID);
+      setTestOrders((current) => ({
+        ...current,
+        [level.key]: reordered.map((test) => test.id),
+      }));
+    },
+    [level, orderedTests],
+  );
 
   const updateCode = useCallback(
     (code: string) => {
@@ -186,7 +217,7 @@ function App() {
       const nextResult = await runTests(
         level.key,
         levelProgress.code,
-        [],
+        orderedTests.map((test) => test.id),
         controller.signal,
       );
       if (version !== runVersionRef.current) return;
@@ -239,7 +270,7 @@ function App() {
         setRunning(false);
       }
     }
-  }, [editRevision, level, levelProgress]);
+  }, [editRevision, level, levelProgress, orderedTests]);
 
   useEffect(() => {
     if (
@@ -622,7 +653,7 @@ function App() {
             >
               <Console
                 result={result}
-                tests={level.tests}
+                tests={orderedTests}
                 running={running}
                 testsVisible={testsVisible}
                 onShowTests={() => setTestsVisible(true)}
@@ -637,7 +668,8 @@ function App() {
                     onReset={() => resetPane("tests")}
                   />
                   <ExerciseTests
-                    tests={level.tests}
+                    tests={orderedTests}
+                    onMove={moveTest}
                     onHide={() => setTestsVisible(false)}
                   />
                 </>
@@ -862,11 +894,142 @@ function Console({
 
 function ExerciseTests({
   tests,
+  onMove,
   onHide,
 }: {
   tests: Level["tests"];
+  onMove: (movingID: string, targetID: string) => void;
   onHide: () => void;
 }) {
+  const [draggingID, setDraggingID] = useState<string | null>(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const draggingIDRef = useRef<string | null>(null);
+  const dragOffsetRef = useRef({ x: 0, y: 0 });
+  const pointerRef = useRef({ x: 0, y: 0 });
+  const dragStartXRef = useRef(0);
+  const grabOffsetYRef = useRef(0);
+
+  const resetDragging = useCallback(() => {
+    draggingIDRef.current = null;
+    dragOffsetRef.current = { x: 0, y: 0 };
+    setDragOffset({ x: 0, y: 0 });
+    setDraggingID(null);
+  }, []);
+
+  useEffect(() => {
+    if (!draggingID) return;
+    const stop = () => resetDragging();
+    window.addEventListener("pointerup", stop);
+    window.addEventListener("pointercancel", stop);
+    window.addEventListener("blur", stop);
+    return () => {
+      window.removeEventListener("pointerup", stop);
+      window.removeEventListener("pointercancel", stop);
+      window.removeEventListener("blur", stop);
+    };
+  }, [draggingID, resetDragging]);
+
+  useLayoutEffect(() => {
+    if (!draggingID) return;
+    const card = document.querySelector<HTMLElement>(
+      `[data-test-id="${draggingID}"]`,
+    );
+    const list = card?.closest(".exercise-test-list");
+    if (!card || !list) return;
+
+    const cardBounds = card.getBoundingClientRect();
+    const desiredTop = draggedCardTop(
+      list,
+      card,
+      draggingID,
+      pointerRef.current.y,
+      grabOffsetYRef.current,
+    );
+    const correction = desiredTop - cardBounds.top;
+    if (Math.abs(correction) < 0.5) return;
+
+    const next = {
+      ...dragOffsetRef.current,
+      y: Math.round(dragOffsetRef.current.y + correction),
+    };
+    dragOffsetRef.current = next;
+    setDragOffset(next);
+  }, [draggingID, tests]);
+
+  const startDragging = (
+    event: ReactPointerEvent<HTMLButtonElement>,
+    testID: string,
+  ) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    const card = event.currentTarget.closest(".exercise-test");
+    const list = event.currentTarget.closest(".exercise-test-list");
+    if (!card || !list) return;
+    const bounds = card.getBoundingClientRect();
+    pointerRef.current = { x: event.clientX, y: event.clientY };
+    dragStartXRef.current = event.clientX;
+    grabOffsetYRef.current = event.clientY - bounds.top;
+    dragOffsetRef.current = { x: 0, y: 0 };
+    setDragOffset({ x: 0, y: 0 });
+    draggingIDRef.current = testID;
+    setDraggingID(testID);
+    list.setPointerCapture(event.pointerId);
+  };
+
+  const moveDraggedTest = (
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => {
+    const movingID = draggingIDRef.current;
+    if (!movingID) return;
+    event.preventDefault();
+    pointerRef.current = { x: event.clientX, y: event.clientY };
+
+    const list = event.currentTarget;
+    const target = Array.from(
+      list.querySelectorAll<HTMLElement>("[data-test-id]"),
+    ).find((element) => {
+      if (element.dataset.testId === movingID) return false;
+      const bounds = element.getBoundingClientRect();
+      return event.clientY >= bounds.top && event.clientY <= bounds.bottom;
+    });
+    const targetID = target?.dataset.testId;
+    if (targetID && targetID !== movingID) onMove(movingID, targetID);
+
+    const card = document.querySelector<HTMLElement>(
+      `[data-test-id="${movingID}"]`,
+    );
+    if (!card) return;
+    const listBounds = list.getBoundingClientRect();
+    const cardBounds = card.getBoundingClientRect();
+    const desiredTop = draggedCardTop(
+      list,
+      card,
+      movingID,
+      event.clientY,
+      grabOffsetYRef.current,
+    );
+    const next = {
+      x: Math.round(clamp(event.clientX - dragStartXRef.current, -18, 18)),
+      y: Math.round(
+        dragOffsetRef.current.y + desiredTop - cardBounds.top,
+      ),
+    };
+    dragOffsetRef.current = next;
+    setDragOffset(next);
+
+    if (event.clientY < listBounds.top + 32) list.scrollBy({ top: -16 });
+    if (event.clientY > listBounds.bottom - 32) list.scrollBy({ top: 16 });
+  };
+
+  const stopDragging = (
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    resetDragging();
+  };
+
   return (
     <section className="exercise-tests">
       <h2>
@@ -877,12 +1040,57 @@ function ExerciseTests({
           <EyeOff /> Hide
         </button>
       </h2>
-      <div className="exercise-test-list">
+      <div
+        className={`exercise-test-list${draggingID ? " dragging-test" : ""}`}
+        onLostPointerCapture={resetDragging}
+        onPointerCancel={stopDragging}
+        onPointerMove={moveDraggedTest}
+        onPointerUp={stopDragging}
+      >
         {tests.map((test, index) => (
-          <article className="exercise-test" key={test.id}>
-            <div>
+          <article
+            className={`exercise-test${draggingID === test.id ? " dragging" : ""}`}
+            data-test-id={test.id}
+            key={test.id}
+            style={
+              draggingID === test.id
+                ? ({
+                    "--drag-x": `${dragOffset.x}px`,
+                    "--drag-y": `${dragOffset.y}px`,
+                  } as React.CSSProperties)
+                : undefined
+            }
+          >
+            <div className="test-title">
+              <button
+                aria-label={`Drag ${test.name} to reorder`}
+                className="test-drag-handle"
+                onPointerDown={(event) => startDragging(event, test.id)}
+                title="Drag to change execution order"
+                type="button"
+              >
+                <GripVertical aria-hidden="true" />
+              </button>
               <span>#{index + 1}</span>
               <strong>{test.name}</strong>
+              <div className="test-order-controls">
+                <button
+                  aria-label={`Move ${test.name} earlier`}
+                  disabled={index === 0}
+                  onClick={() => onMove(test.id, tests[index - 1].id)}
+                  title="Run this test earlier"
+                >
+                  <ArrowUp />
+                </button>
+                <button
+                  aria-label={`Move ${test.name} later`}
+                  disabled={index === tests.length - 1}
+                  onClick={() => onMove(test.id, tests[index + 1].id)}
+                  title="Run this test later"
+                >
+                  <ArrowDown />
+                </button>
+              </div>
             </div>
             <p>{test.purpose}</p>
             <dl>
@@ -903,6 +1111,33 @@ function ExerciseTests({
         ))}
       </div>
     </section>
+  );
+}
+
+function draggedCardTop(
+  list: Element,
+  card: HTMLElement,
+  movingID: string,
+  pointerY: number,
+  grabOffsetY: number,
+): number {
+  const cards = Array.from(
+    list.querySelectorAll<HTMLElement>("[data-test-id]"),
+  );
+  const index = cards.findIndex(
+    (candidate) => candidate.dataset.testId === movingID,
+  );
+  const previousCardBottom =
+    index === cards.length - 1 && index > 0
+      ? cards[index - 1].getBoundingClientRect().bottom
+      : undefined;
+  const viewport = list.getBoundingClientRect();
+  return constrainDragTop(
+    pointerY - grabOffsetY,
+    viewport.top,
+    viewport.bottom,
+    card.offsetHeight,
+    previousCardBottom,
   );
 }
 
