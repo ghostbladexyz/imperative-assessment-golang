@@ -226,14 +226,21 @@ func runCommand(parent context.Context, directory string, limit int, name string
 
 func parseResults(stdout string) []sandboxprotocol.TestResult {
 	results := make([]sandboxprotocol.TestResult, 0)
+	var pendingOutput []string
 	for _, line := range strings.Split(strings.ReplaceAll(stdout, "\r\n", "\n"), "\n") {
-		_, payload, found := splitResultLine(line)
+		prefix, payload, found := splitResultLine(line)
 		if !found {
+			pendingOutput = append(pendingOutput, line)
 			continue
+		}
+		if prefix != "" {
+			pendingOutput = append(pendingOutput, prefix)
 		}
 		var result sandboxprotocol.TestResult
 		if json.Unmarshal([]byte(payload), &result) == nil {
+			result.Stdout = strings.TrimSpace(strings.Join(pendingOutput, "\n"))
 			results = append(results, result)
+			pendingOutput = nil
 		}
 	}
 	return results

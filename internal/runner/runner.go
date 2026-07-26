@@ -163,7 +163,13 @@ func (engine *Engine) Run(ctx context.Context, level assessment.Level, source st
 	defer engine.release()
 
 	outcome := engine.adapter.Execute(ctx, plan)
-	return engine.complete(plan, outcome, result, len(testIDs) == 0, started)
+	return engine.complete(
+		plan,
+		outcome,
+		result,
+		len(plan.tests) == len(level.Tests),
+		started,
+	)
 }
 
 func (engine *Engine) acquire(ctx context.Context, result *RunResult, started time.Time) bool {
@@ -199,6 +205,9 @@ func (engine *Engine) complete(
 	result.RuntimeError = outcome.runtimeError
 	result.FailureKind = outcome.failureKind
 	applyWireResults(&result, outcome.results)
+	if stdout, found := selectedTestStdout(result.Results, outcome.results); found {
+		result.Stdout = stdout
+	}
 
 	switch outcome.status {
 	case executionCompileTimeout:
@@ -350,7 +359,27 @@ type wireResult struct {
 	ID         string  `json:"id"`
 	Actual     string  `json:"actual"`
 	Failure    string  `json:"failure"`
+	Stdout     string  `json:"stdout,omitempty"`
 	DurationMS float64 `json:"durationMs"`
+}
+
+func selectedTestStdout(results []TestResult, wires []wireResult) (string, bool) {
+	if len(results) == 0 || len(wires) == 0 {
+		return "", false
+	}
+	selectedID := results[len(results)-1].ID
+	for _, result := range results {
+		if !result.Passed {
+			selectedID = result.ID
+			break
+		}
+	}
+	for _, wire := range wires {
+		if wire.ID == selectedID {
+			return wire.Stdout, true
+		}
+	}
+	return "", false
 }
 
 func markAll(results []TestResult, status, failure string) {

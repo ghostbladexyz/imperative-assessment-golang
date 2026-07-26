@@ -61,6 +61,23 @@ func TestDockerRunnerIntegration(t *testing.T) {
 		assertNoAssessmentContainers(t)
 	})
 
+	t.Run("student output stays with its test", func(t *testing.T) {
+		result := sandbox.Run(
+			context.Background(),
+			level,
+			`import "fmt"
+			func CountAlpha(input string) int {
+				fmt.Print("sandbox-output")
+				return 0
+			}`,
+			[]string{"l29-02"},
+		)
+		if result.Stdout != "sandbox-output" {
+			t.Fatalf("stdout = %q, want sandbox-output", result.Stdout)
+		}
+		assertNoAssessmentContainers(t)
+	})
+
 	t.Run("invalid Go returns compiler error", func(t *testing.T) {
 		result := sandbox.Run(
 			context.Background(),

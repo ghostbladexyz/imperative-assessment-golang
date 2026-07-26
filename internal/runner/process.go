@@ -61,14 +61,21 @@ func runCommandInput(parent context.Context, limit int, stdin []byte, name strin
 
 func parseResults(stdout string) []wireResult {
 	var results []wireResult
+	var pendingOutput []string
 	for _, line := range strings.Split(strings.ReplaceAll(stdout, "\r\n", "\n"), "\n") {
-		_, payload, found := splitResultLine(line, "__IMPERATIVE_ASSESSMENT_RESULT__")
+		prefix, payload, found := splitResultLine(line, "__IMPERATIVE_ASSESSMENT_RESULT__")
 		if !found {
+			pendingOutput = append(pendingOutput, line)
 			continue
+		}
+		if prefix != "" {
+			pendingOutput = append(pendingOutput, prefix)
 		}
 		var result wireResult
 		if json.Unmarshal([]byte(payload), &result) == nil {
+			result.Stdout = strings.TrimSpace(strings.Join(pendingOutput, "\n"))
 			results = append(results, result)
+			pendingOutput = nil
 		}
 	}
 	return results

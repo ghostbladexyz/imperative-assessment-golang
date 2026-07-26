@@ -42,6 +42,23 @@ func TestPublicLevelsDoNotExposeHarnesses(t *testing.T) {
 	}
 }
 
+func TestSelectTestsPreservesRequestedExecutionOrder(t *testing.T) {
+	t.Parallel()
+	level := Levels()[0]
+	first, second, third := level.Tests[0], level.Tests[1], level.Tests[2]
+
+	selected, valid := SelectTests(level, []string{third.ID, first.ID, second.ID})
+
+	if !valid {
+		t.Fatal("expected known test identifiers to be accepted")
+	}
+	for index, want := range []string{third.ID, first.ID, second.ID} {
+		if selected[index].ID != want {
+			t.Fatalf("selected test %d = %q, want %q", index, selected[index].ID, want)
+		}
+	}
+}
+
 func TestZone01CatalogueRemainsComplete(t *testing.T) {
 	t.Parallel()
 	for sourceID := 22; sourceID <= 65; sourceID++ {

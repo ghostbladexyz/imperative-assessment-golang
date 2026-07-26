@@ -74,6 +74,79 @@ func TestEngineOwnsPreparationVerdictsAndCompletion(t *testing.T) {
 	}
 }
 
+func TestEngineTreatsAReorderedCompleteSuiteAsTheWholeSuite(t *testing.T) {
+	level := mustExercise(t, "foundation/1")
+	testIDs := make([]string, 0, len(level.Tests))
+	wires := make([]wireResult, 0, len(level.Tests))
+	for index := len(level.Tests) - 1; index >= 0; index-- {
+		testIDs = append(testIDs, level.Tests[index].ID)
+		wires = append(wires, wireResult{
+			ID: level.Tests[index].ID, Actual: level.Tests[index].Expected,
+		})
+	}
+	adapter := &outcomeAdapter{outcome: executionOutcome{
+		status: executionSuccess, results: wires,
+	}}
+
+	result := newEngine(adapter, 1, testIssuer{}).Run(
+		context.Background(),
+		level,
+		"func Echo(value string) string { return value }",
+		testIDs,
+	)
+
+	if !result.Passed || result.Receipt == "" {
+		t.Fatalf("reordered complete suite was not treated as complete: %#v", result)
+	}
+	for index, want := range testIDs {
+		if adapter.plan.tests[index].ID != want || result.Results[index].ID != want {
+			t.Fatalf("test %d did not preserve requested order %q", index, want)
+		}
+	}
+}
+
+func TestEngineSelectsOutputForTheFirstFailureOrLastPassingTest(t *testing.T) {
+	level := mustExercise(t, "foundation/1")
+	passing := make([]wireResult, 0, len(level.Tests))
+	for index, test := range level.Tests {
+		passing = append(passing, wireResult{
+			ID: test.ID, Actual: test.Expected, Stdout: fmt.Sprintf("output-%d", index+1),
+		})
+	}
+
+	for _, test := range []struct {
+		name    string
+		results []wireResult
+		want    string
+	}{
+		{
+			name: "first failure",
+			results: func() []wireResult {
+				items := append([]wireResult(nil), passing...)
+				items[1].Actual = `"wrong"`
+				return items
+			}(),
+			want: "output-2",
+		},
+		{name: "last passing test", results: passing, want: "output-5"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			adapter := &outcomeAdapter{outcome: executionOutcome{
+				status: executionSuccess, stdout: "all outputs", results: test.results,
+			}}
+			result := newEngine(adapter, 1, nil).Run(
+				context.Background(),
+				level,
+				"func Echo(value string) string { return value }",
+				nil,
+			)
+			if result.Stdout != test.want {
+				t.Fatalf("stdout = %q, want %q", result.Stdout, test.want)
+			}
+		})
+	}
+}
+
 func TestRunnerAcceptsCorrectAndRejectsIncorrectCode(t *testing.T) {
 	level := mustExercise(t, "zone01/29")
 	localRunner := New("go", 1, testIssuer{})

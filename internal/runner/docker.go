@@ -271,7 +271,8 @@ func (docker *dockerAdapter) Execute(ctx context.Context, plan executionPlan) ex
 	wires := make([]wireResult, 0, len(response.Results))
 	for _, item := range response.Results {
 		wires = append(wires, wireResult{
-			ID: item.ID, Actual: item.Actual, Failure: item.Failure, DurationMS: item.DurationMS,
+			ID: item.ID, Actual: item.Actual, Failure: item.Failure,
+			Stdout: item.Stdout, DurationMS: item.DurationMS,
 		})
 	}
 	outcome := executionOutcome{

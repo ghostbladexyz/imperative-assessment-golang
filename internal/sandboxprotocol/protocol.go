@@ -67,6 +67,7 @@ type TestResult struct {
 	ID         string  `json:"id"`
 	Actual     string  `json:"actual"`
 	Failure    string  `json:"failure,omitempty"`
+	Stdout     string  `json:"stdout,omitempty"`
 	DurationMS float64 `json:"durationMs"`
 }
 
