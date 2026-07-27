@@ -107,6 +107,95 @@ describe("progress state", () => {
     expect(reconciled.exercises[added.key].code).toBe(added.starterCode);
   });
 
+  it("refreshes an untouched legacy return starter for a print-only exercise", () => {
+    const printedLevel = {
+      ...levels[21],
+      key: "piscine/1016",
+      signature: "DescendComb()",
+      starterCode: `package main
+
+import "github.com/01-edu/z01"
+
+func DescendComb() {
+	// TODO: print the required output with z01.PrintRune.
+	_ = z01.PrintRune
+}
+`,
+      instructions: {
+        hints: [],
+        allowedPackages: ["github.com/01-edu/z01"],
+      },
+    } as unknown as Level;
+    const printedCatalogue = {
+      ...catalogue,
+      levels: [printedLevel],
+      legacyProgress: {
+        ...catalogue.legacyProgress,
+        exerciseKeys: [printedLevel.key],
+      },
+    };
+    const saved = createProgress(printedCatalogue);
+    saved.exercises[printedLevel.key].code = `package main
+
+func DescendComb() string {
+	// TODO: implement the checkpoint behavior.
+	return ""
+}
+`;
+    delete (
+      saved.exercises[printedLevel.key] as unknown as Record<string, unknown>
+    ).starterSnapshot;
+
+    const reconciled = validateImport(saved, printedCatalogue);
+
+    expect(reconciled.exercises[printedLevel.key].code).toBe(
+      printedLevel.starterCode,
+    );
+  });
+
+  it("refreshes untouched code when a tracked starter changes", () => {
+    const saved = createProgress(catalogue);
+    const changedLevel = {
+      ...levels[0],
+      starterCode: "func solve() { /* revised */ }",
+    };
+    const changedCatalogue = {
+      ...catalogue,
+      levels: [changedLevel, ...levels.slice(1)],
+    };
+
+    const reconciled = validateImport(saved, changedCatalogue);
+
+    expect(reconciled.exercises[changedLevel.key].code).toBe(
+      changedLevel.starterCode,
+    );
+    expect(reconciled.exercises[changedLevel.key].starterSnapshot).toBe(
+      changedLevel.starterCode,
+    );
+  });
+
+  it("preserves learner edits when a tracked starter changes", () => {
+    const saved = createProgress(catalogue);
+    saved.exercises[levels[0].key].code = "func solve() { learnerEdit() }";
+    const changedLevel = {
+      ...levels[0],
+      starterCode: "func solve() { /* revised */ }",
+    };
+    const changedCatalogue = {
+      ...catalogue,
+      levels: [changedLevel, ...levels.slice(1)],
+    };
+
+    const reconciled = validateImport(saved, changedCatalogue);
+
+    expect(reconciled.exercises[changedLevel.key].code).toBe(
+      "func solve() { learnerEdit() }",
+    );
+    expect(reconciled.exercises[changedLevel.key].starterSnapshot).toBe(
+      changedLevel.starterCode,
+    );
+  });
+
   it("rejects a foreign schema", () => {
     expect(() => validateImport({ schemaVersion: 99 }, catalogue)).toThrow(
       /schema version 5 or 4/,

@@ -11,6 +11,7 @@ import type {
 export const STORAGE_KEY = "imperative-go-assessment:progress";
 export const LEGACY_STORAGE_KEY = "imperative-go-assessment:progress:v4";
 export const ASSESSMENT_SECONDS = 6 * 60 * 60;
+const Z01_PACKAGE = "github.com/01-edu/z01";
 
 export const defaultSettings = (): Settings => ({
   theme:
@@ -36,6 +37,7 @@ export const defaultTimer = (): TimerState => ({
 export function makeExerciseProgress(level: Level): ExerciseProgress {
   return {
     code: level.starterCode,
+    starterSnapshot: level.starterCode,
     passed: false,
     attempts: 0,
     timeSpentSeconds: 0,
@@ -150,7 +152,7 @@ function reconcileExercises(
       throw new Error(`The backup has invalid data for exercise ${level.key}.`);
     }
     const target = clean.exercises[level.key];
-    target.code = candidate.code.slice(0, 192 * 1024);
+    target.code = reconcileExerciseCode(candidate, level);
     target.receipt =
       typeof candidate.receipt === "string" ? candidate.receipt : undefined;
     target.passed = candidate.passed === true && Boolean(target.receipt);
@@ -186,6 +188,39 @@ function reconcileExercises(
           .slice(0, 10)
       : [];
   }
+}
+
+// reconcileExerciseCode refreshes untouched starter code while preserving learner edits across catalog changes.
+function reconcileExerciseCode(
+  candidate: Record<string, unknown>,
+  level: Level,
+): string {
+  const savedCode = String(candidate.code).slice(0, 192 * 1024);
+  if (typeof candidate.starterSnapshot === "string") {
+    const previousStarter = candidate.starterSnapshot.slice(0, 192 * 1024);
+    return savedCode === previousStarter && previousStarter !== level.starterCode
+      ? level.starterCode
+      : savedCode;
+  }
+  return isLegacyGeneratedPrintStarter(savedCode, level)
+    ? level.starterCode
+    : savedCode;
+}
+
+// isLegacyGeneratedPrintStarter recognizes only the old untouched template so migrated progress never discards authored code.
+function isLegacyGeneratedPrintStarter(code: string, level: Level): boolean {
+  if (!level.instructions.allowedPackages?.includes(Z01_PACKAGE)) return false;
+  const openingParenthesis = level.signature.indexOf("(");
+  if (openingParenthesis < 1) return false;
+  const functionName = level.signature.slice(0, openingParenthesis).trim();
+  const escapedName = functionName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const oldTemplate = new RegExp(
+    `^(?:package\\s+main\\s+)?func\\s+${escapedName}\\s*` +
+      `\\([^{}\\n]*\\)\\s+[^{}\\n]+\\{\\s*` +
+      `//\\s*TODO:\\s*implement the checkpoint behavior\\.\\s*` +
+      `return\\s+(?:""|0|nil|false)\\s*\\}$`,
+  );
+  return oldTemplate.test(code.replace(/\r\n/g, "\n").trim());
 }
 
 function reconcileSharedState(

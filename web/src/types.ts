@@ -115,6 +115,7 @@ export interface HistoryEntry {
 
 export interface ExerciseProgress {
   code: string;
+  starterSnapshot: string;
   receipt?: string;
   passed: boolean;
   attempts: number;
