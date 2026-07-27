@@ -79,6 +79,9 @@ func execute(request sandboxprotocol.Request, requestErr error) sandboxprotocol.
 	if err := os.WriteFile(filepath.Join(workspace, "assessment_harness.go"), []byte(request.Harness), 0o600); err != nil {
 		return internalFailure("The sandbox could not prepare the controlled tests.")
 	}
+	if err := writeSubmissionModule(workspace); err != nil {
+		return internalFailure("The sandbox could not prepare its Go module.")
+	}
 
 	executable := filepath.Join(workspace, "assessment-program")
 	compileCtx, cancelCompile := context.WithTimeout(
