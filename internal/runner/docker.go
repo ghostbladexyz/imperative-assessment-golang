@@ -433,6 +433,7 @@ func imageInputHash(root string) (string, error) {
 	for _, directory := range []string{
 		filepath.Join("cmd", "sandbox-runner"),
 		filepath.Join("internal", "sandboxprotocol"),
+		filepath.Join("third_party", "z01"),
 	} {
 		err := filepath.WalkDir(filepath.Join(root, directory), func(path string, entry fs.DirEntry, walkErr error) error {
 			if walkErr != nil {
