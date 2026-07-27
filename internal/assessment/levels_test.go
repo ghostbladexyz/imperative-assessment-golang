@@ -79,6 +79,18 @@ func TestPublicLevelsDoNotExposeHarnesses(t *testing.T) {
 	}
 }
 
+func TestPublicLevelsSerializeFrontendAllowlistsAsArrays(t *testing.T) {
+	t.Parallel()
+	for _, level := range PublicLevels() {
+		if level.Instructions.AllowedBuiltins == nil {
+			t.Errorf("exercise %q serializes allowedBuiltins as null", level.Key)
+		}
+		if level.Instructions.AllowedPackages == nil {
+			t.Errorf("exercise %q serializes allowedPackages as null", level.Key)
+		}
+	}
+}
+
 func TestSelectTestsPreservesRequestedExecutionOrder(t *testing.T) {
 	t.Parallel()
 	level := Levels()[0]

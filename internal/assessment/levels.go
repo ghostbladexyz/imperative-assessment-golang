@@ -253,7 +253,7 @@ func cloneLevel(level Level) Level {
 	level.Instructions.Constraints = append([]string(nil), level.Instructions.Constraints...)
 	level.Instructions.Examples = append([]Example(nil), level.Instructions.Examples...)
 	level.Instructions.Documentation = append([]DocumentationLink(nil), level.Instructions.Documentation...)
-	level.Instructions.AllowedBuiltins = append([]string(nil), level.Instructions.AllowedBuiltins...)
+	level.Instructions.AllowedBuiltins = append([]string{}, level.Instructions.AllowedBuiltins...)
 	level.Instructions.AllowedPackages = append([]string(nil), level.Instructions.AllowedPackages...)
 	level.Instructions.Allowed = append([]string(nil), level.Instructions.Allowed...)
 	level.Instructions.Disallowed = append([]string(nil), level.Instructions.Disallowed...)
