@@ -1,6 +1,7 @@
 package assessment
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -34,7 +35,7 @@ func TestDefinitionsAreComplete(t *testing.T) {
 			}
 			seenExamples[example] = struct{}{}
 		}
-		if len(level.Instructions.AllowedBuiltins) == 0 ||
+		if (len(level.Instructions.AllowedBuiltins) == 0 && level.answerMode != printedAnswer) ||
 			len(level.Instructions.AllowedPackages) == 0 {
 			t.Fatalf("exercise %q has no explicit source policy", level.Key)
 		}
@@ -174,6 +175,57 @@ func TestKinoz01CatalogueAddsOneHundredAndSixUniqueExercises(t *testing.T) {
 	t.Parallel()
 	if got := len(piscineLevels()); got != 106 {
 		t.Fatalf("got %d kinoz01 exercises, want 106", got)
+	}
+}
+
+func TestSourceAuditPreservesPrintedOutputExercises(t *testing.T) {
+	t.Parallel()
+	wanted := map[ExerciseKey]bool{
+		"piscine/1001": true, "piscine/1002": true, "piscine/1003": true,
+		"piscine/1004": true, "piscine/1005": true, "piscine/1008": true,
+		"piscine/1009": true, "piscine/1010": true, "piscine/1011": true,
+		"piscine/1012": true, "piscine/1013": true, "piscine/1014": true,
+		"piscine/1015": true, "piscine/1016": true, "piscine/1017": true,
+		"piscine/1018": true, "piscine/1050": true, "piscine/1051": true,
+		"piscine/1060": true, "piscine/1061": true, "piscine/1062": true,
+		"piscine/1063": true, "piscine/1064": true, "piscine/1072": true,
+		"piscine/1079": true, "piscine/1086": true,
+		"zone01/22": true, "zone01/34": true, "zone01/48": true,
+		"zone01/49": true, "zone01/53": true,
+	}
+
+	for _, level := range Levels() {
+		_, shouldPrint := wanted[level.Key]
+		if (level.answerMode == printedAnswer) != shouldPrint {
+			t.Errorf("exercise %q printed mode = %t, want %t", level.Key, level.answerMode == printedAnswer, shouldPrint)
+			continue
+		}
+		if !shouldPrint {
+			continue
+		}
+		delete(wanted, level.Key)
+		if len(level.Instructions.AllowedPackages) != 1 ||
+			level.Instructions.AllowedPackages[0] != z01Package {
+			t.Errorf("exercise %q packages = %v, want only %q", level.Key, level.Instructions.AllowedPackages, z01Package)
+		}
+		for _, builtin := range level.Instructions.AllowedBuiltins {
+			if builtin == "print" || builtin == "println" {
+				t.Errorf("exercise %q allows %q instead of requiring z01.PrintRune", level.Key, builtin)
+			}
+		}
+		if !strings.Contains(level.StarterCode, `"github.com/01-edu/z01"`) ||
+			!strings.Contains(level.StarterCode, "z01.PrintRune") {
+			t.Errorf("exercise %q starter does not provide z01.PrintRune", level.Key)
+		}
+		for _, current := range level.Tests {
+			var printed string
+			if err := json.Unmarshal([]byte(current.Expected), &printed); err != nil {
+				t.Errorf("exercise %q test %q expected value is not printed text: %q", level.Key, current.Name, current.Expected)
+			}
+		}
+	}
+	if len(wanted) != 0 {
+		t.Fatalf("source-audited exercises are missing: %v", wanted)
 	}
 }
 
