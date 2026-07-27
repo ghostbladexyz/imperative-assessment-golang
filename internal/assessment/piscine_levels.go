@@ -498,7 +498,7 @@ func piscineQuestSixAndSevenSpecs() []practiceSpec {
 				splitCase("Edges", ",go,", ",", []string{"", "go", ""}),
 				splitCase("Wide separator", "a--b", "--", []string{"a", "b"}),
 			}),
-		piscineSpec(1072, "Print Words Tables", "Piscine Quest 7", "PrintWordsTables(values []string) string",
+		piscinePrintSpec(1072, "Print Words Tables", "Piscine Quest 7", "PrintWordsTables(values []string) string",
 			"Format every word from a table on its own line.", "A string slice.", "Every element followed by newline.",
 			nil, stringsField, "PrintWordsTables(current.Payload.Values)", `""`,
 			[]practiceCase{
