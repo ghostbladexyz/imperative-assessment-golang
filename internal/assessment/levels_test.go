@@ -20,8 +20,19 @@ func TestDefinitionsAreComplete(t *testing.T) {
 		if len(level.Instructions.Hints) < 3 {
 			t.Fatalf("exercise %q has fewer than three hints", level.Key)
 		}
-		if len(level.Instructions.Examples) < 4 {
-			t.Fatalf("exercise %q has fewer than four examples", level.Key)
+		if len(level.Instructions.Examples) == 0 || len(level.Instructions.Examples) > maxPracticeExamples {
+			t.Fatalf("exercise %q has %d examples, want between 1 and %d", level.Key, len(level.Instructions.Examples), maxPracticeExamples)
+		}
+		exerciseCallPrefix := functionName(level.Signature) + "("
+		seenExamples := make(map[Example]struct{}, len(level.Instructions.Examples))
+		for _, example := range level.Instructions.Examples {
+			if !strings.HasPrefix(example.Input, exerciseCallPrefix) {
+				t.Fatalf("exercise %q includes an example from another function: %#v", level.Key, example)
+			}
+			if _, exists := seenExamples[example]; exists {
+				t.Fatalf("exercise %q repeats example %#v", level.Key, example)
+			}
+			seenExamples[example] = struct{}{}
 		}
 		if len(level.Instructions.AllowedBuiltins) == 0 ||
 			len(level.Instructions.AllowedPackages) == 0 {
@@ -29,6 +40,31 @@ func TestDefinitionsAreComplete(t *testing.T) {
 		}
 		if harness := level.BuildHarness(level.Tests[:1]); harness == "" {
 			t.Fatalf("exercise %q generated an empty harness", level.Key)
+		}
+	}
+}
+
+// TestEveryExerciseHasCleanTestCoverage audits duplicate and synthetic rows across the complete catalogue.
+func TestEveryExerciseHasCleanTestCoverage(t *testing.T) {
+	t.Parallel()
+	for _, level := range Levels() {
+		seenNames := make(map[string]struct{}, len(level.Tests))
+		seenRows := make(map[string]struct{}, len(level.Tests))
+		for _, current := range level.Tests {
+			if strings.Contains(current.Name, "stability pass") ||
+				strings.Contains(current.Purpose, "stability pass") ||
+				strings.Contains(current.Input, "stability pass") {
+				t.Errorf("exercise %q contains a synthetic stability row %#v", level.Key, current)
+			}
+			if _, exists := seenNames[current.Name]; exists {
+				t.Errorf("exercise %q repeats test name %q", level.Key, current.Name)
+			}
+			seenNames[current.Name] = struct{}{}
+			row := current.Input + "\x00" + current.Expected
+			if _, exists := seenRows[row]; exists {
+				t.Errorf("exercise %q repeats test input and expectation %q", level.Key, current.Input)
+			}
+			seenRows[row] = struct{}{}
 		}
 	}
 }

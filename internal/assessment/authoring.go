@@ -32,7 +32,10 @@ type practiceSpec struct {
 	cases       []practiceCase
 }
 
+const maxPracticeExamples = 5
+
 func compilePracticeExercise(source exerciseSource, spec practiceSpec) Level {
+	spec.cases = deduplicatePracticeCases(spec.cases)
 	instructions := baseInstructions(
 		spec.objective,
 		"func "+spec.signature,
@@ -43,16 +46,7 @@ func compilePracticeExercise(source exerciseSource, spec practiceSpec) Level {
 	instructions.Constraints = append([]string(nil), spec.constraints...)
 	instructions.Hints = append([]string(nil), spec.hints...)
 	instructions.CommonPitfalls = append([]string(nil), spec.pitfalls...)
-	instructions.Examples = make([]Example, 0, 4)
-	if len(spec.cases) > 0 {
-		for index := 0; index < 4; index++ {
-			current := spec.cases[index%len(spec.cases)]
-			instructions.Examples = append(instructions.Examples, Example{
-				Input:  functionName(spec.signature) + "(" + current.input + ")",
-				Output: current.expected,
-			})
-		}
-	}
+	instructions.Examples = practiceExamples(spec)
 	packages := spec.packages
 	if len(packages) == 0 {
 		packages = []string{"fmt"}
@@ -81,6 +75,32 @@ func compilePracticeExercise(source exerciseSource, spec practiceSpec) Level {
 			return buildPracticeHarness(inputFields, call, selected)
 		},
 	}
+}
+
+// deduplicatePracticeCases keeps the first authored assertion because identical input and output exercise the same behavior.
+func deduplicatePracticeCases(cases []practiceCase) []practiceCase {
+	unique := make([]practiceCase, 0, len(cases))
+	seen := make(map[string]struct{}, len(cases))
+	for _, current := range cases {
+		key := current.input + "\x00" + current.expected
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		unique = append(unique, current)
+	}
+	return unique
+}
+
+// practiceExamples shows up to five genuine cases from the current spec without padding the panel with duplicates.
+func practiceExamples(spec practiceSpec) []Example {
+	examples := make([]Example, 0, maxPracticeExamples)
+	for index := 0; index < maxPracticeExamples && index < len(spec.cases); index++ {
+		current := spec.cases[index]
+		input := functionName(spec.signature) + "(" + current.input + ")"
+		examples = append(examples, Example{Input: input, Output: current.expected})
+	}
+	return examples
 }
 
 func validatePracticeSpec(source exerciseSource, spec practiceSpec) error {

@@ -30,14 +30,45 @@ func TestAuthoringCompilerDerivesExecutableExercise(t *testing.T) {
 	if exercise.Key != "foundation/7" || exercise.Tests[0].ID != "l7-01" {
 		t.Fatalf("unexpected compiled identity: %#v", exercise)
 	}
-	if len(exercise.Instructions.Examples) != 4 {
-		t.Fatalf("got %d examples, want 4", len(exercise.Instructions.Examples))
+	if len(exercise.Instructions.Examples) != 1 {
+		t.Fatalf("got %d examples, want 1 genuine example", len(exercise.Instructions.Examples))
 	}
 	harness := exercise.BuildHarness(exercise.Tests)
 	for _, required := range []string{"type inputCase struct", spec.call, exercise.Tests[0].ID} {
 		if !strings.Contains(harness, required) {
 			t.Fatalf("harness is missing %q", required)
 		}
+	}
+}
+
+// TestExerciseCompilerRemovesDuplicateCases verifies duplicate assertions do not reach either the test list or teaching examples.
+func TestExerciseCompilerRemovesDuplicateCases(t *testing.T) {
+	t.Parallel()
+	spec := practiceSpec{
+		id: 22, title: "Classify", topic: "Conditions", difficulty: "Beginner",
+		signature: "Classify(value int) bool",
+		objective: "Classify an integer.", input: "One integer.", output: "A classification.",
+		starter:     "func Classify(value int) bool {\n\treturn false\n}\n",
+		inputFields: intField,
+		call:        "Classify(current.Payload.Value)",
+		cases: []practiceCase{
+			pc("Negative", "-1", "false", map[string]any{"value": -1}),
+			pc("Zero", "0", "true", map[string]any{"value": 0}),
+			pc("Positive", "1", "true", map[string]any{"value": 1}),
+			pc("Duplicate negative", "-1", "false", map[string]any{"value": -1}),
+		},
+	}
+
+	exercise := compilePracticeExercise(sourcePiscine, spec)
+
+	if len(exercise.Tests) != 3 {
+		t.Fatalf("got %d tests, want 3 unique tests", len(exercise.Tests))
+	}
+	if exercise.Tests[0].Name != "Negative" || exercise.Tests[2].Name != "Positive" {
+		t.Fatalf("first occurrence order was not preserved: %#v", exercise.Tests)
+	}
+	if len(exercise.Instructions.Examples) != 3 {
+		t.Fatalf("got %d examples, want 3 unique examples", len(exercise.Instructions.Examples))
 	}
 }
 
