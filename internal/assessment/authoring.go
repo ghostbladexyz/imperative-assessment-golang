@@ -195,6 +195,25 @@ type wireCase struct {
 	return harness(commonImports(), declarations, loop, tests)
 }
 
+func buildPrintedPracticeHarness(inputFields, call string, tests []VisibleTest) string {
+	declarations := `type inputCase struct {
+	` + inputFields + `
+}
+type wireCase struct {
+	ID string ` + "`json:\"id\"`" + `
+	Payload inputCase ` + "`json:\"payload\"`" + `
+}`
+	loop := `	var tests []wireCase
+	_ = json.Unmarshal([]byte(raw), &tests)
+	for _, current := range tests {
+		current := current
+		assessmentRunPrinted(current.ID, func() {
+			` + call + `
+		})
+	}`
+	return harness(commonImports(), declarations, loop, tests)
+}
+
 func pc(name, input, expected string, payload any) practiceCase {
 	return practiceCase{name: name, input: input, expected: expected, payload: payload}
 }
