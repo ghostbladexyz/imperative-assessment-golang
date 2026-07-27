@@ -48,6 +48,20 @@ func TestDockerRunnerIntegration(t *testing.T) {
 		assertNoAssessmentContainers(t)
 	})
 
+	t.Run("z01 printed output passes offline", func(t *testing.T) {
+		printCombination := mustExercise(t, "piscine/1014")
+		result := sandbox.Run(
+			context.Background(),
+			printCombination,
+			correctPrintCombinationSolution,
+			nil,
+		)
+		if !result.Passed || !strings.Contains(result.Stdout, "012, 013") {
+			t.Fatalf("z01 printed solution failed: %#v", result)
+		}
+		assertNoAssessmentContainers(t)
+	})
+
 	t.Run("incorrect solution fails assertions", func(t *testing.T) {
 		result := sandbox.Run(
 			context.Background(),
