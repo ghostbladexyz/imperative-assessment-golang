@@ -278,7 +278,7 @@ func zone01Levels() []Level {
 			[]practiceCase{
 				pc("Complete sequence", ``, jsonString(reverseComboExpected()), map[string]any{}),
 			}),
-		zoneSpec(49, "Print Memory", "Bytes · hexadecimal", "Checkpoint 35%",
+		zonePrintSpec(49, "Print Memory", "Bytes · hexadecimal", "Checkpoint 35%",
 			"PrintMemory(value [10]byte) string",
 			"Render ten bytes as hexadecimal and printable ASCII.",
 			"An array of exactly 10 bytes.", "Three lowercase hex rows (4, 4, 2 bytes), then an ASCII row; every row ends with newline.",
