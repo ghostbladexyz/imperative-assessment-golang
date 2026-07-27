@@ -218,6 +218,41 @@ func TestRunnerCapturesStudentStandardOutput(t *testing.T) {
 	}
 }
 
+func TestRunnerAssessesZ01PrintedOutput(t *testing.T) {
+	level := mustExercise(t, "piscine/1014")
+	result := New("go", 1, nil).Run(
+		context.Background(),
+		level,
+		correctPrintCombinationSolution,
+		nil,
+	)
+	if !result.Passed {
+		t.Fatalf("correct printed solution failed: %#v", result)
+	}
+	if !strings.Contains(result.Stdout, "012, 013") {
+		t.Fatalf("printed answer was not shown in the console: %q", result.Stdout)
+	}
+}
+
+const correctPrintCombinationSolution = `import "github.com/01-edu/z01"
+
+func PrintComb() {
+	for first := '0'; first <= '7'; first++ {
+		for second := first + 1; second <= '8'; second++ {
+			for third := second + 1; third <= '9'; third++ {
+				z01.PrintRune(first)
+				z01.PrintRune(second)
+				z01.PrintRune(third)
+				if first != '7' {
+					z01.PrintRune(',')
+					z01.PrintRune(' ')
+				}
+			}
+		}
+	}
+	z01.PrintRune('\n')
+}`
+
 func TestRunnerTerminatesTimeout(t *testing.T) {
 	level := mustExercise(t, "zone01/29")
 	result := New("go", 1, nil).Run(
