@@ -422,11 +422,11 @@ func piscineQuestSixAndSevenSpecs() []practiceSpec {
 			"Sort command-line arguments by ascending ASCII order.", "A slice containing arguments, without the program name.", "The sorted arguments, one per line.",
 			[]string{"append", "len"}, stringsField, "SortParams(current.Payload.Values)", `nil`,
 			[]practiceCase{
-				stringsSliceCase("None", []string{}, []string{}),
-				stringsSliceCase("Mixed", []string{"z", "a", "m"}, []string{"a", "m", "z"}),
-				stringsSliceCase("Case-sensitive", []string{"a", "B", "A"}, []string{"A", "B", "a"}),
+				stringsOutputCase("None", []string{}, ""),
+				stringsOutputCase("Mixed", []string{"z", "a", "m"}, "a\nm\nz\n"),
+				stringsOutputCase("Case-sensitive", []string{"a", "B", "A"}, "A\nB\na\n"),
 			}),
-		piscineSpec(1063, "Number Convert Alpha", "Piscine Quest 6", "NbrConvertAlpha(values []int, upper bool) string",
+		piscinePrintSpec(1063, "Number Convert Alpha", "Piscine Quest 6", "NbrConvertAlpha(values []int, upper bool) string",
 			"Convert numbers 1 through 26 into alphabet letters.", "Integer values and a case flag.", "Letters for valid values; invalid values become spaces. Append newline.",
 			nil, intsBoolFields, "NbrConvertAlpha(current.Payload.Values, current.Payload.Upper)", `"\n"`,
 			[]practiceCase{
