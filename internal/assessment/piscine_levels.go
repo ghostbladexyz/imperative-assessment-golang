@@ -555,7 +555,7 @@ func piscineQuestEightAndNineSpecs() []practiceSpec {
 				virtualFilesCase("Available", []string{"a"}, map[string]string{"a": "hello\n"}, "hello\n"),
 				virtualFilesCase("Unavailable", []string{"x"}, map[string]string{"a": "A"}, "Cannot read file\n"),
 			}),
-		piscineSpec(1079, "Cat", "Piscine Quest 8", "Cat(names []string, files map[string]string, stdin string) string",
+		piscinePrintSpec(1079, "Cat", "Piscine Quest 8", "Cat(names []string, files map[string]string, stdin string) string",
 			"Concatenate virtual files, or return standard input when no names are supplied.", "File names, available contents, and simulated standard input.", "Contents in order; missing files contribute a diagnostic line.",
 			[]string{"len"}, catFields, "Cat(current.Payload.Names, current.Payload.Files, current.Payload.Stdin)", `""`,
 			[]practiceCase{
