@@ -614,14 +614,14 @@ func piscineQuestEightAndNineSpecs() []practiceSpec {
 				foldCase("Multiply", []int{2, 3, 4}, 1, "multiply", 24),
 				foldCase("Maximum", []int{-2, 7, 3}, -10, "maximum", 7),
 			}),
-		piscineSpec(1086, "Reduce Int", "Piscine Quest 8", "ReduceInt(values []int, operation string) int",
-			"Reduce a non-empty integer slice from its first value.", "Values and operation: add, multiply, or maximum.", "The reduced value; zero for empty input.",
+		piscinePrintSpec(1086, "Reduce Int", "Piscine Quest 8", "ReduceInt(values []int, operation string) int",
+			"Reduce a non-empty integer slice from its first value.", "Values and operation: add, multiply, or maximum.", "The reduced value followed by newline; zero for empty input.",
 			[]string{"len"}, intsOperationFields, "ReduceInt(current.Payload.Values, current.Payload.Operation)", `0`,
 			[]practiceCase{
-				intsOperationIntCase("Empty", []int{}, "add", 0),
-				intsOperationIntCase("Add", []int{1, 2, 3}, "add", 6),
-				intsOperationIntCase("Multiply", []int{2, 3, 4}, "multiply", 24),
-				intsOperationIntCase("Maximum", []int{-2, 7, 3}, "maximum", 7),
+				intsOperationOutputCase("Empty", []int{}, "add", "0\n"),
+				intsOperationOutputCase("Add", []int{1, 2, 3}, "add", "6\n"),
+				intsOperationOutputCase("Multiply", []int{2, 3, 4}, "multiply", "24\n"),
+				intsOperationOutputCase("Maximum", []int{-2, 7, 3}, "maximum", "7\n"),
 			}),
 		piscineSpec(1087, "Is Sorted", "Piscine Quest 8", "IsSorted(values []int, order string) bool",
 			"Check whether integers follow an ascending or descending comparator.", "Integer values and order: ascending or descending.", "true when every neighboring pair follows the requested order.",
@@ -1007,8 +1007,8 @@ func foldCase(name string, values []int, initial int, operation string, expected
 	return pc(name, fmt.Sprintf("%v, %d, %s", values, initial, jsonString(operation)), fmt.Sprint(expected), map[string]any{"values": values, "initial": initial, "operation": operation})
 }
 
-func intsOperationIntCase(name string, values []int, operation string, expected int) practiceCase {
-	return pc(name, fmt.Sprintf("%v, %s", values, jsonString(operation)), fmt.Sprint(expected), map[string]any{"values": values, "operation": operation})
+func intsOperationOutputCase(name string, values []int, operation, expected string) practiceCase {
+	return pc(name, fmt.Sprintf("%v, %s", values, jsonString(operation)), jsonString(expected), map[string]any{"values": values, "operation": operation})
 }
 
 func intsOrderCase(name string, values []int, order string, expected bool) practiceCase {
