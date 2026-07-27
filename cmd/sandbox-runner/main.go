@@ -18,9 +18,17 @@ import (
 )
 
 const (
-	maxRequestBytes = 1024 * 1024
-	maxSourceBytes  = 192 * 1024
-	resultMarker    = "__IMPERATIVE_ASSESSMENT_RESULT__"
+	maxRequestBytes  = 1024 * 1024
+	maxSourceBytes   = 192 * 1024
+	resultMarker     = "__IMPERATIVE_ASSESSMENT_RESULT__"
+	submissionModule = `module assessment.local/submission
+
+go 1.23
+
+require github.com/01-edu/z01 v0.1.0
+
+replace github.com/01-edu/z01 => /opt/z01
+`
 )
 
 func main() {
@@ -166,6 +174,10 @@ func execute(request sandboxprotocol.Request, requestErr error) sandboxprotocol.
 		response.RuntimeError = "The program stopped before every test produced a result."
 	}
 	return response
+}
+
+func writeSubmissionModule(workspace string) error {
+	return os.WriteFile(filepath.Join(workspace, "go.mod"), []byte(submissionModule), 0o600)
 }
 
 func internalFailure(message string) sandboxprotocol.Response {
