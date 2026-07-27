@@ -402,7 +402,7 @@ func piscineQuestSixAndSevenSpecs() []practiceSpec {
 				stringsOutputCase("One", []string{"go"}, "go\n"),
 				stringsOutputCase("Several", []string{"first", "last"}, "last\n"),
 			}),
-		piscineSpec(1060, "Print Parameters", "Piscine Quest 6", "PrintParams(arguments []string) string",
+		piscinePrintSpec(1060, "Print Parameters", "Piscine Quest 6", "PrintParams(arguments []string) string",
 			"Format command-line arguments in their original order.", "A slice containing arguments, without the program name.", "Every argument on its own line.",
 			nil, stringsField, "PrintParams(current.Payload.Values)", `""`,
 			[]practiceCase{
@@ -410,7 +410,7 @@ func piscineQuestSixAndSevenSpecs() []practiceSpec {
 				stringsOutputCase("One", []string{"go"}, "go\n"),
 				stringsOutputCase("Several", []string{"go", "lang"}, "go\nlang\n"),
 			}),
-		piscineSpec(1061, "Reverse Parameters", "Piscine Quest 6", "ReverseParams(arguments []string) string",
+		piscinePrintSpec(1061, "Reverse Parameters", "Piscine Quest 6", "ReverseParams(arguments []string) string",
 			"Format command-line arguments from last to first.", "A slice containing arguments, without the program name.", "Every argument on its own line in reverse order.",
 			[]string{"len"}, stringsField, "ReverseParams(current.Payload.Values)", `""`,
 			[]practiceCase{
