@@ -229,6 +229,17 @@ func TestSourceAuditPreservesPrintedOutputExercises(t *testing.T) {
 			!strings.Contains(level.StarterCode, "z01.PrintRune") {
 			t.Errorf("exercise %q starter does not provide z01.PrintRune", level.Key)
 		}
+		closingParenthesis := strings.LastIndex(level.Signature, ")")
+		if closingParenthesis < 0 ||
+			strings.TrimSpace(level.Signature[closingParenthesis+1:]) != "" {
+			t.Errorf("exercise %q signature still declares a return value: %q", level.Key, level.Signature)
+		}
+		for _, line := range strings.Split(level.StarterCode, "\n") {
+			statement := strings.TrimSpace(line)
+			if statement == "return" || strings.HasPrefix(statement, "return ") {
+				t.Errorf("exercise %q starter still contains %q", level.Key, statement)
+			}
+		}
 		for _, current := range level.Tests {
 			var printed string
 			if err := json.Unmarshal([]byte(current.Expected), &printed); err != nil {
