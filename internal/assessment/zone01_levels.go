@@ -512,6 +512,19 @@ func zoneSpec(
 	}
 }
 
+func zonePrintSpec(
+	id int,
+	title, topic, difficulty, signature, objective, input, output string,
+	builtins []string,
+	inputFields, call, zero string,
+	cases []practiceCase,
+) practiceSpec {
+	return printedPracticeSpec(zoneSpec(
+		id, title, topic, difficulty, signature, objective, input, output,
+		builtins, inputFields, call, zero, cases,
+	))
+}
+
 func functionStarter(signature, zero string) string {
 	return fmt.Sprintf("func %s {\n\t// TODO: implement the checkpoint behavior.\n\treturn %s\n}\n", signature, zero)
 }
