@@ -15,3 +15,7 @@ _Avoid_: Exercise ID
 **Exercise Progress**:
 The learner's saved work and completion state for one exercise, associated with its Exercise Key.
 _Avoid_: Level progress, position-keyed progress
+
+**Answer Mode**:
+The way an exercise exposes the value assessed by its tests: either a returned value or exact printed output.
+_Avoid_: Test type, output type
