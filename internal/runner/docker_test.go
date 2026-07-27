@@ -464,6 +464,7 @@ func makeImageFixture(t *testing.T) string {
 		filepath.Join(root, "docker"),
 		filepath.Join(root, "cmd", "sandbox-runner"),
 		filepath.Join(root, "internal", "sandboxprotocol"),
+		filepath.Join(root, "third_party", "z01"),
 	} {
 		if err := os.MkdirAll(directory, 0o700); err != nil {
 			t.Fatal(err)
@@ -475,6 +476,8 @@ func makeImageFixture(t *testing.T) string {
 		filepath.Join("docker", "runner.Dockerfile"):         "FROM scratch\n",
 		filepath.Join("cmd", "sandbox-runner", "main.go"):    "package main\n",
 		filepath.Join("internal", "sandboxprotocol", "p.go"): "package sandboxprotocol\n",
+		filepath.Join("third_party", "z01", "go.mod"):        "module github.com/01-edu/z01\ngo 1.23\n",
+		filepath.Join("third_party", "z01", "z01.go"):        "package z01\n",
 	}
 	for relative, content := range files {
 		if err := os.WriteFile(filepath.Join(root, relative), []byte(content), 0o600); err != nil {
