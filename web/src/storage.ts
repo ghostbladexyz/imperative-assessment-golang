@@ -11,6 +11,7 @@ import type {
 export const STORAGE_KEY = "imperative-go-assessment:progress";
 export const LEGACY_STORAGE_KEY = "imperative-go-assessment:progress:v4";
 export const ASSESSMENT_SECONDS = 6 * 60 * 60;
+const Z01_PACKAGE = "github.com/01-edu/z01";
 
 export const defaultSettings = (): Settings => ({
   theme:
@@ -150,7 +151,10 @@ function reconcileExercises(
       throw new Error(`The backup has invalid data for exercise ${level.key}.`);
     }
     const target = clean.exercises[level.key];
-    target.code = candidate.code.slice(0, 192 * 1024);
+    target.code = reconcileExerciseCode(
+      candidate.code.slice(0, 192 * 1024),
+      level,
+    );
     target.receipt =
       typeof candidate.receipt === "string" ? candidate.receipt : undefined;
     target.passed = candidate.passed === true && Boolean(target.receipt);
@@ -186,6 +190,86 @@ function reconcileExercises(
           .slice(0, 10)
       : [];
   }
+}
+
+// reconcileExerciseCode upgrades saved z01 solutions because browser storage can outlive an exercise contract.
+function reconcileExerciseCode(code: string, level: Level): string {
+  if (
+    !level.instructions.allowedPackages?.includes(Z01_PACKAGE) ||
+    !code.includes(Z01_PACKAGE)
+  ) {
+    return code;
+  }
+
+  const functionName = level.signature.slice(0, level.signature.indexOf("("));
+  if (!functionName) return code;
+  const escapedName = functionName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const declaration = new RegExp(
+    `\\bfunc\\s+${escapedName}(\\s*\\([^{}\\n]*\\))\\s*([^{}\\n]*)\\{`,
+  );
+  const match = declaration.exec(code);
+  if (!match || !match[2].trim()) return code;
+
+  const openingBrace = match.index + match[0].lastIndexOf("{");
+  const closingBrace = findClosingBrace(code, openingBrace);
+  if (closingBrace < 0) return code;
+
+  const header = `func ${functionName}${match[1]} {`;
+  const body = code
+    .slice(openingBrace + 1, closingBrace)
+    .replace(/\n[ \t]*return\s+(?:""|0|nil|false)\s*;?[ \t]*\n?[ \t]*$/, "\n");
+  return (
+    code.slice(0, match.index) +
+    header +
+    body +
+    code.slice(closingBrace)
+  );
+}
+
+// findClosingBrace ignores Go literals and comments so braces in printed text do not truncate the saved function.
+function findClosingBrace(code: string, openingBrace: number): number {
+  let depth = 1;
+  let quote = "";
+  let lineComment = false;
+  let blockComment = false;
+
+  for (let index = openingBrace + 1; index < code.length; index += 1) {
+    const current = code[index];
+    const next = code[index + 1];
+    if (lineComment) {
+      if (current === "\n") lineComment = false;
+      continue;
+    }
+    if (blockComment) {
+      if (current === "*" && next === "/") {
+        blockComment = false;
+        index += 1;
+      }
+      continue;
+    }
+    if (quote) {
+      if (quote !== "`" && current === "\\") {
+        index += 1;
+      } else if (current === quote) {
+        quote = "";
+      }
+      continue;
+    }
+    if (current === "/" && next === "/") {
+      lineComment = true;
+      index += 1;
+    } else if (current === "/" && next === "*") {
+      blockComment = true;
+      index += 1;
+    } else if (current === `"` || current === "'" || current === "`") {
+      quote = current;
+    } else if (current === "{") {
+      depth += 1;
+    } else if (current === "}" && --depth === 0) {
+      return index;
+    }
+  }
+  return -1;
 }
 
 function reconcileSharedState(
