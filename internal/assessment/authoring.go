@@ -42,6 +42,8 @@ const (
 
 const maxPracticeExamples = 5
 
+const z01Package = "github.com/01-edu/z01"
+
 func compilePracticeExercise(source exerciseSource, spec practiceSpec) Level {
 	spec.cases = deduplicatePracticeCases(spec.cases)
 	instructions := baseInstructions(
@@ -83,6 +85,38 @@ func compilePracticeExercise(source exerciseSource, spec practiceSpec) Level {
 			return buildPracticeHarness(inputFields, call, selected)
 		},
 	}
+}
+
+func printedPracticeSpec(spec practiceSpec) practiceSpec {
+	closingParenthesis := strings.LastIndex(spec.signature, ")")
+	if closingParenthesis >= 0 {
+		spec.signature = spec.signature[:closingParenthesis+1]
+	}
+	spec.answerMode = printedAnswer
+	spec.packages = []string{z01Package}
+	spec.starter = fmt.Sprintf(`import %q
+
+func %s {
+	// TODO: print the required output with z01.PrintRune.
+	_ = z01.PrintRune
+}
+`, z01Package, spec.signature)
+	spec.constraints = []string{
+		"Keep the required function name and parameters.",
+		"Print the exact output with z01.PrintRune; do not return it.",
+		"Match the stated edge cases and whitespace exactly.",
+	}
+	spec.hints = []string{
+		"Start with the smallest example, then handle the boundary cases.",
+		"Print one rune at a time with z01.PrintRune.",
+		"Check separators and final newlines carefully.",
+	}
+	spec.pitfalls = []string{
+		"Returning a value instead of printing it",
+		"Using fmt instead of the required z01 package",
+		"Printing an extra separator or missing the final newline",
+	}
+	return spec
 }
 
 // deduplicatePracticeCases keeps the first authored assertion because identical input and output exercise the same behavior.
