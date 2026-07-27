@@ -270,7 +270,7 @@ func zone01Levels() []Level {
 				[]string{"", "a", "aaa", "abbccc", "YouuungFellllas"},
 				[]string{"", "1a", "3a", "1a2b3c", "1Y1o3u1n1g1F1e4l1a1s"},
 			)),
-		zoneSpec(48, "Print Reverse Combo", "Loops · enumeration", "Checkpoint 35%",
+		zonePrintSpec(48, "Print Reverse Combo", "Loops · enumeration", "Checkpoint 35%",
 			"PrintRevCombo() string",
 			"Generate every strictly descending three-digit combination from 987 to 210.",
 			"No input.", "Combinations in descending order, separated by comma and space, followed by newline.",
