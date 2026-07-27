@@ -87,3 +87,22 @@ func TestAuthoringCompilerRejectsSynchronizedFieldDrift(t *testing.T) {
 		t.Fatalf("unexpected authoring validation error: %v", err)
 	}
 }
+
+func TestPrintCombinationUsesItsOriginalPrintedOutputContract(t *testing.T) {
+	t.Parallel()
+
+	exercise, found := FindExercise("piscine/1014")
+	if !found {
+		t.Fatal("Print Combination exercise is missing")
+	}
+	if exercise.Signature != "PrintComb()" {
+		t.Fatalf("signature = %q, want PrintComb()", exercise.Signature)
+	}
+	if !strings.Contains(exercise.StarterCode, `"github.com/01-edu/z01"`) ||
+		!strings.Contains(exercise.StarterCode, "z01.PrintRune") {
+		t.Fatal("starter does not teach the required z01.PrintRune output contract")
+	}
+	if !strings.Contains(exercise.BuildHarness(exercise.Tests), "assessmentRunPrinted") {
+		t.Fatal("harness does not assess printed output")
+	}
+}
