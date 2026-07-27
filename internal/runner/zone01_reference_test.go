@@ -37,7 +37,8 @@ func TestZone01ReferenceSolutionsPass(t *testing.T) {
 
 func zone01ReferenceSolutions() map[int]string {
 	return map[int]string{
-		22: `func OnlyA() string { return "a" }`,
+		22: `import "github.com/01-edu/z01"
+func OnlyA() { z01.PrintRune('a') }`,
 		23: `func PrintIfNot(value string) string {
 	if len(value) < 3 { return "G\n" }
 	return "Invalid Input\n"
@@ -114,13 +115,16 @@ func zone01ReferenceSolutions() map[int]string {
 	for value > 0 { count++; value /= base }
 	return count
 }`,
-		34: `func SearchReplace(value, old, replacement string) string {
-	if len(old) != 1 || len(replacement) != 1 { return value }
-	result := ""
-	for i := 0; i < len(value); i++ {
-		if value[i] == old[0] { result += replacement } else { result += string(value[i]) }
+		34: `import "github.com/01-edu/z01"
+func SearchReplace(value, old, replacement string) {
+	for _, current := range value {
+		if len(old) == 1 && len(replacement) == 1 && current == rune(old[0]) {
+			z01.PrintRune(rune(replacement[0]))
+		} else {
+			z01.PrintRune(current)
+		}
 	}
-	return result
+	z01.PrintRune('\n')
 }`,
 		35: `func RepeatAlpha(value string) string {
 	result := ""
@@ -270,30 +274,34 @@ func ZipString(value string) string {
 	if count > 0 { result += fmt.Sprintf("%d%c", count, previous) }
 	return result
 }`,
-		48: `import "fmt"
-func PrintRevCombo() string {
-	result := ""
+		48: `import "github.com/01-edu/z01"
+func PrintRevCombo() {
+	firstOutput := true
 	for first := 9; first >= 2; first-- {
 		for second := first-1; second >= 1; second-- {
 			for third := second-1; third >= 0; third-- {
-				if result != "" { result += ", " }
-				result += fmt.Sprintf("%d%d%d", first, second, third)
+				if !firstOutput { z01.PrintRune(','); z01.PrintRune(' ') }
+				z01.PrintRune(rune(first) + '0')
+				z01.PrintRune(rune(second) + '0')
+				z01.PrintRune(rune(third) + '0')
+				firstOutput = false
 			}
 		}
 	}
-	return result + "\n"
+	z01.PrintRune('\n')
 }`,
-		49: `import "fmt"
-func PrintMemory(value [10]byte) string {
-	result := ""
+		49: `import "github.com/01-edu/z01"
+func PrintMemory(value [10]byte) {
+	digits := "0123456789abcdef"
 	for i, current := range value {
-		result += fmt.Sprintf("%02x", current)
-		if i == 3 || i == 7 || i == 9 { result += "\n" } else { result += " " }
+		z01.PrintRune(rune(digits[current >> 4]))
+		z01.PrintRune(rune(digits[current & 15]))
+		if i == 3 || i == 7 || i == 9 { z01.PrintRune('\n') } else { z01.PrintRune(' ') }
 	}
 	for _, current := range value {
-		if current >= 32 && current <= 126 { result += string(current) } else { result += "." }
+		if current >= 32 && current <= 126 { z01.PrintRune(rune(current)) } else { z01.PrintRune('.') }
 	}
-	return result + "\n"
+	z01.PrintRune('\n')
 }`,
 		50: `func ConcatSlice(left, right []int) []int {
 	result := []int{}
@@ -318,14 +326,17 @@ func PrintMemory(value [10]byte) string {
 	}
 	return index == len(needle)
 }`,
-		53: `func WdMatch(needle, haystack string) string {
-	if needle == "" { return "" }
+		53: `import "github.com/01-edu/z01"
+func WdMatch(needle, haystack string) {
+	if needle == "" { return }
 	index := 0
 	for cursor := 0; cursor < len(haystack) && index < len(needle); cursor++ {
 		if needle[index] == haystack[cursor] { index++ }
 	}
-	if index == len(needle) { return needle }
-	return ""
+	if index == len(needle) {
+		for _, current := range needle { z01.PrintRune(current) }
+		z01.PrintRune('\n')
+	}
 }`,
 		54: `func Inter(left, right string) string {
 	result := ""
