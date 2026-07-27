@@ -821,6 +821,19 @@ func piscineSpec(
 	)
 }
 
+func piscinePrintSpec(
+	id int,
+	title, difficulty, signature, objective, input, output string,
+	builtins []string,
+	inputFields, call, zero string,
+	cases []practiceCase,
+) practiceSpec {
+	return printedPracticeSpec(piscineSpec(
+		id, title, difficulty, signature, objective, input, output,
+		builtins, inputFields, call, zero, cases,
+	))
+}
+
 func ascendingTriplesExpected() string {
 	var result strings.Builder
 	for first := 0; first <= 7; first++ {
