@@ -334,7 +334,7 @@ func piscineQuestFiveSpecs() []practiceSpec {
 				[]string{"", "123", "abc-12def3", "a1-23", "--42", "no digits"},
 				[]int{0, 123, -123, 123, -42, 0},
 			)),
-		piscineSpec(1050, "Print Number In Order", "Piscine Quest 5", "PrintNbrInOrder(value int) string",
+		piscinePrintSpec(1050, "Print Number In Order", "Piscine Quest 5", "PrintNbrInOrder(value int) string",
 			"Sort the decimal digits of a non-negative integer.", "One non-negative integer.", "Its digits in ascending order.",
 			nil, intField, "PrintNbrInOrder(current.Payload.Value)", `""`,
 			[]practiceCase{
@@ -343,7 +343,7 @@ func piscineQuestFiveSpecs() []practiceSpec {
 				intOutputCase("Mixed", 3214, "1234"),
 				intOutputCase("Repeated", 90901, "00199"),
 			}),
-		piscineSpec(1051, "Print Number In Base", "Piscine Quest 5", "PrintNbrBase(value int, base string) string",
+		piscinePrintSpec(1051, "Print Number In Base", "Piscine Quest 5", "PrintNbrBase(value int, base string) string",
 			"Format an integer using a caller-provided digit alphabet.", "An integer and base alphabet.", "The representation, or \"NV\" when the base is invalid.",
 			[]string{"len"}, intBaseStringFields, "PrintNbrBase(current.Payload.Value, current.Payload.Base)", `""`,
 			[]practiceCase{
