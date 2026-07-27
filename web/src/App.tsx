@@ -743,7 +743,7 @@ function ExerciseBrief({ level, passed }: { level: Level; passed: boolean }) {
             <strong>Accept:</strong> {instructions.input}
           </li>
           <li>
-            <strong>Return:</strong> {instructions.output}
+            <strong>Output:</strong> {instructions.output}
           </li>
           {instructions.constraints.map((rule) => (
             <li key={rule}>{rule}</li>
