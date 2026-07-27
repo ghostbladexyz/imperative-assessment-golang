@@ -434,7 +434,7 @@ func piscineQuestSixAndSevenSpecs() []practiceSpec {
 				intsBoolStringCase("Uppercase", []int{7, 15}, true, "GO\n"),
 				intsBoolStringCase("Invalid", []int{1, 0, 26, 27}, false, "a z \n"),
 			}),
-		piscineSpec(1064, "Program Name", "Piscine Quest 6", "ProgramName(name string) string",
+		piscinePrintSpec(1064, "Program Name", "Piscine Quest 6", "ProgramName(name string) string",
 			"Format the executable name as the piscine program would print it.", "One program name.", "The name followed by newline.",
 			nil, stringField, "ProgramName(current.Payload.Value)", `"\n"`,
 			stringCases([]string{"main", "./app", "go-task"}, []string{"main\n", "./app\n", "go-task\n"})),
