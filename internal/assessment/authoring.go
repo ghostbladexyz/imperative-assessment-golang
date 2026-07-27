@@ -62,6 +62,9 @@ func compilePracticeExercise(source exerciseSource, spec practiceSpec) Level {
 		packages = []string{"fmt"}
 	}
 	setSourcePolicy(&instructions, spec.builtins, packages)
+	if spec.answerMode == printedAnswer {
+		instructions.AllowedBuiltins = append([]string{}, spec.builtins...)
+	}
 
 	tests := make([]VisibleTest, 0, len(spec.cases))
 	for index, current := range spec.cases {
@@ -74,14 +77,18 @@ func compilePracticeExercise(source exerciseSource, spec practiceSpec) Level {
 			current.payload,
 		))
 	}
-	inputFields, call := spec.inputFields, spec.call
+	inputFields, call, mode := spec.inputFields, spec.call, spec.answerMode
 	return Level{
 		Key: exerciseKey(source, spec.id), ID: spec.id, Title: spec.title, Topic: spec.topic,
 		Difficulty: spec.difficulty, Signature: spec.signature,
 		StarterCode: spec.starter, Instructions: instructions, Tests: tests,
 		source: source, sourceID: spec.id, order: curriculumOrder(source, spec.id),
+		answerMode:    mode,
 		definitionErr: validatePracticeSpec(source, spec),
 		build: func(selected []VisibleTest) string {
+			if mode == printedAnswer {
+				return buildPrintedPracticeHarness(inputFields, call, selected)
+			}
 			return buildPracticeHarness(inputFields, call, selected)
 		},
 	}
