@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -30,5 +32,21 @@ func TestResultProtocolSurvivesUnterminatedStudentOutput(t *testing.T) {
 	}
 	if output := stripMarkers(stdout); output != "Hello\nAgain" {
 		t.Fatalf("internal protocol leaked into stdout: %q", output)
+	}
+}
+
+func TestSubmissionModuleProvidesZ01Offline(t *testing.T) {
+	workspace := t.TempDir()
+	if err := writeSubmissionModule(workspace); err != nil {
+		t.Fatal(err)
+	}
+	module, err := os.ReadFile(filepath.Join(workspace, "go.mod"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := string(module)
+	if !strings.Contains(content, "github.com/01-edu/z01 v0.1.0") ||
+		!strings.Contains(content, "replace github.com/01-edu/z01 => /opt/z01") {
+		t.Errorf("go.mod does not pin the bundled z01 module: %s", content)
 	}
 }
