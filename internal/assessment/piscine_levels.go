@@ -418,8 +418,8 @@ func piscineQuestSixAndSevenSpecs() []practiceSpec {
 				stringsOutputCase("One", []string{"go"}, "go\n"),
 				stringsOutputCase("Several", []string{"one", "two", "three"}, "three\ntwo\none\n"),
 			}),
-		piscineSpec(1062, "Sort Parameters", "Piscine Quest 6", "SortParams(arguments []string) []string",
-			"Sort command-line arguments by ascending ASCII order.", "A slice containing arguments, without the program name.", "A new sorted slice.",
+		piscinePrintSpec(1062, "Sort Parameters", "Piscine Quest 6", "SortParams(arguments []string) []string",
+			"Sort command-line arguments by ascending ASCII order.", "A slice containing arguments, without the program name.", "The sorted arguments, one per line.",
 			[]string{"append", "len"}, stringsField, "SortParams(current.Payload.Values)", `nil`,
 			[]practiceCase{
 				stringsSliceCase("None", []string{}, []string{}),
