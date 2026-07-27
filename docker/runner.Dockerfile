@@ -2,12 +2,14 @@ FROM golang:1.26.5-alpine3.24@sha256:0178a641fbb4858c5f1b48e34bdaabe0350a330a1b1
 
 WORKDIR /src
 COPY go.mod ./
+COPY third_party/z01 ./third_party/z01
 COPY internal/sandboxprotocol ./internal/sandboxprotocol
 COPY cmd/sandbox-runner ./cmd/sandbox-runner
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/sandbox-runner ./cmd/sandbox-runner
 
 FROM golang:1.26.5-alpine3.24@sha256:0178a641fbb4858c5f1b48e34bdaabe0350a330a1b1149aabd498d0699ff5fb2 AS toolchain
 
+WORKDIR /src
 RUN mkdir -p /opt/go-build \
     && GOCACHE=/opt/go-build CGO_ENABLED=0 GOMAXPROCS=1 go install -p=1 -trimpath \
     bufio \
@@ -37,9 +39,11 @@ RUN mkdir -p /opt/go-build \
 
 FROM scratch
 
-ENV PATH=/usr/local/go/bin
+ENV PATH=/usr/local/go/bin \
+    GOPROXY=off
 COPY --from=toolchain --chown=65532:65532 /usr/local/go /usr/local/go
 COPY --from=toolchain --chown=65532:65532 /opt/go-build /opt/go-build
+COPY --chown=65532:65532 third_party/z01 /opt/z01
 COPY --from=builder --chown=65532:65532 /out/sandbox-runner /sandbox-runner
 
 USER 65532:65532
