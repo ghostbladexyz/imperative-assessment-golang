@@ -79,7 +79,7 @@ func piscineQuestTwoSpecs() []practiceSpec {
 				intOutputCase("Positive", 1, "F\n"),
 				intOutputCase("Large negative", -999, "T\n"),
 			}),
-		piscineSpec(1013, "Print Number", "Piscine Quest 2", "PrintNbr(value int) string",
+		piscinePrintSpec(1013, "Print Number", "Piscine Quest 2", "PrintNbr(value int) string",
 			"Convert any int to decimal output without strconv.", "One integer.", "Its exact base-10 representation.",
 			nil, intField, "PrintNbr(current.Payload.Value)", `""`,
 			[]practiceCase{
