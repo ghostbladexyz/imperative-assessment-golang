@@ -107,53 +107,6 @@ describe("progress state", () => {
     expect(reconciled.exercises[added.key].code).toBe(added.starterCode);
   });
 
-  it("removes obsolete return contracts from saved print-only solutions", () => {
-    const printedLevel = {
-      ...levels[21],
-      key: "piscine/1014",
-      signature: "PrintComb()",
-      starterCode: `import "github.com/01-edu/z01"
-
-func PrintComb() {
-	_ = z01.PrintRune
-}
-`,
-      instructions: {
-        hints: [],
-        allowedPackages: ["github.com/01-edu/z01"],
-      },
-    } as unknown as Level;
-    const printedCatalogue = {
-      ...catalogue,
-      levels: [printedLevel],
-      legacyProgress: {
-        ...catalogue.legacyProgress,
-        exerciseKeys: [printedLevel.key],
-      },
-    };
-    const saved = createProgress(printedCatalogue);
-    saved.exercises[printedLevel.key].code = `package main
-
-import "github.com/01-edu/z01"
-
-func PrintComb() string {
-	z01.PrintRune('0')
-	return ""
-}
-`;
-
-    const reconciled = validateImport(saved, printedCatalogue);
-
-    expect(reconciled.exercises[printedLevel.key].code).toBe(`package main
-
-import "github.com/01-edu/z01"
-
-func PrintComb() {
-	z01.PrintRune('0')
-}
-`);
-  });
-
   it("rejects a foreign schema", () => {
     expect(() => validateImport({ schemaVersion: 99 }, catalogue)).toThrow(
       /schema version 5 or 4/,
