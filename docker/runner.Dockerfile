@@ -24,7 +24,16 @@ RUN mkdir -p /opt/go-build \
     sync \
     sync/atomic \
     time \
-    && chmod -R a+rX /opt/go-build
+    && chmod -R a+rX /opt/go-build \
+    && rm -rf \
+        /usr/local/go/api \
+        /usr/local/go/doc \
+        /usr/local/go/misc \
+        /usr/local/go/test \
+        /usr/local/go/src/cmd \
+        /usr/local/go/bin/gofmt \
+    && find /usr/local/go/src -type f -name '*_test.go' -delete \
+    && find /usr/local/go/src -type d -name testdata -prune -exec rm -rf '{}' +
 
 FROM scratch
 
