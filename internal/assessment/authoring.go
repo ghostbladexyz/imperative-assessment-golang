@@ -30,7 +30,15 @@ type practiceSpec struct {
 	inputFields string
 	call        string
 	cases       []practiceCase
+	answerMode  answerMode
 }
+
+type answerMode uint8
+
+const (
+	returnedAnswer answerMode = iota
+	printedAnswer
+)
 
 const maxPracticeExamples = 5
 

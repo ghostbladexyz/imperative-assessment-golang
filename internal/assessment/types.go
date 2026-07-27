@@ -54,6 +54,7 @@ type Level struct {
 	source        exerciseSource
 	sourceID      int
 	order         int
+	answerMode    answerMode
 	definitionErr error
 }
 
