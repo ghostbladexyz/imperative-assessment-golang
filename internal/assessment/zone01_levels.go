@@ -7,7 +7,7 @@ import "fmt"
 // can be tested without hiding stdout from the learner.
 func zone01Levels() []Level {
 	specs := []practiceSpec{
-		zoneSpec(22, "Only A", "Output · constants", "Checkpoint 5%",
+		zonePrintSpec(22, "Only A", "Output · constants", "Checkpoint 5%",
 			"OnlyA() string",
 			"Return the single lowercase letter a.",
 			"No input.", "Exactly \"a\".",
