@@ -1,6 +1,7 @@
 **
 !.dockerignore
 !go.mod
+!go.sum
 !docker/
 !docker/runner.Dockerfile
 !cmd/
@@ -9,3 +10,7 @@
 !internal/
 !internal/sandboxprotocol/
 !internal/sandboxprotocol/*.go
+!third_party/
+!third_party/z01/
+!third_party/z01/*.go
+!third_party/z01/go.mod
