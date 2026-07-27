@@ -16,6 +16,10 @@ _Avoid_: Exercise ID
 The learner's saved work and completion state for one exercise, associated with its Exercise Key.
 _Avoid_: Level progress, position-keyed progress
 
+**Starter Snapshot**:
+The exact starter code associated with saved Exercise Progress. It distinguishes untouched starter code from a learner's edits when an exercise contract changes.
+_Avoid_: Starter version, default solution
+
 **Answer Mode**:
 The way an exercise exposes the value assessed by its tests: either a returned value or exact printed output.
 _Avoid_: Test type, output type
