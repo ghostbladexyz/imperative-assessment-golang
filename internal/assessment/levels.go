@@ -7,7 +7,10 @@ import (
 	"strings"
 )
 
-const exerciseCount = 171
+const (
+	exerciseCount       = 189
+	legacyExerciseCount = 171
+)
 
 type exerciseSource string
 
@@ -15,6 +18,7 @@ const (
 	sourceFoundation exerciseSource = "foundation"
 	sourcePiscine    exerciseSource = "piscine"
 	sourceZone01     exerciseSource = "zone01"
+	sourceAdvanced   exerciseSource = "advanced"
 )
 
 type catalogueSnapshot struct {
@@ -59,6 +63,7 @@ func Validate() error {
 func buildCatalogue() catalogueSnapshot {
 	levels := foundationalLevels()
 	imported := append(piscineLevels(), zone01Levels()...)
+	imported = append(imported, advancedLevels()...)
 	sort.SliceStable(imported, func(left, right int) bool {
 		return imported[left].order < imported[right].order
 	})
@@ -69,9 +74,15 @@ func buildCatalogue() catalogueSnapshot {
 		byKey:      make(map[ExerciseKey]int, len(levels)),
 		legacyKeys: legacyV4ExerciseKeys(),
 	}
+	trackPositions := make(map[AssessmentTrack]int, 2)
 	for index := range snapshot.levels {
 		level := &snapshot.levels[index]
 		level.ID = index + 1
+		if level.Track == "" {
+			level.Track = TrackCore
+		}
+		trackPositions[level.Track]++
+		level.TrackPosition = trackPositions[level.Track]
 		level.StarterCode = "package main\n\n" + level.StarterCode
 		snapshot.byKey[level.Key] = index
 	}
@@ -89,7 +100,7 @@ func validateCatalogue(snapshot catalogueSnapshot) error {
 		if level.definitionErr != nil {
 			return fmt.Errorf("exercise %q authoring: %w", level.Key, level.definitionErr)
 		}
-		if level.ID != index+1 || level.Key == "" || level.sourceID < 1 ||
+		if level.ID != index+1 || level.Key == "" || level.Track == "" || level.TrackPosition < 1 || level.sourceID < 1 ||
 			len(level.Tests) == 0 || len(level.Tests) > 18 || level.build == nil {
 			return fmt.Errorf("invalid exercise %d definition", level.ID)
 		}
@@ -118,8 +129,8 @@ func validateCatalogue(snapshot catalogueSnapshot) error {
 	if len(snapshot.byKey) != len(snapshot.levels) {
 		return fmt.Errorf("catalogue key index is incomplete")
 	}
-	if len(snapshot.legacyKeys) != exerciseCount {
-		return fmt.Errorf("schema-v4 migration has %d keys, want %d", len(snapshot.legacyKeys), exerciseCount)
+	if len(snapshot.legacyKeys) != legacyExerciseCount {
+		return fmt.Errorf("schema-v4 migration has %d keys, want %d", len(snapshot.legacyKeys), legacyExerciseCount)
 	}
 	seenLegacyKeys := make(map[ExerciseKey]struct{}, len(snapshot.legacyKeys))
 	for position, key := range snapshot.legacyKeys {
@@ -135,7 +146,7 @@ func validateCatalogue(snapshot catalogueSnapshot) error {
 }
 
 func legacyV4ExerciseKeys() []ExerciseKey {
-	keys := make([]ExerciseKey, 0, exerciseCount)
+	keys := make([]ExerciseKey, 0, legacyExerciseCount)
 	appendRange := func(source exerciseSource, first, last int) {
 		for sourceID := first; sourceID <= last; sourceID++ {
 			keys = append(keys, exerciseKey(source, sourceID))
@@ -205,6 +216,8 @@ func curriculumOrder(source exerciseSource, sourceID int) int {
 		default:
 			return 80
 		}
+	case sourceAdvanced:
+		return 90
 	default:
 		return 1_000
 	}

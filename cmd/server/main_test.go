@@ -141,9 +141,11 @@ func TestCataloguePublishesProgressIdentityManifest(t *testing.T) {
 	}
 	if body.ProgressSchemaVersion != progressSchemaVersion ||
 		body.LegacyProgress.SchemaVersion != 4 ||
-		len(body.LegacyProgress.ExerciseKeys) != len(body.Levels) ||
+		len(body.LegacyProgress.ExerciseKeys) != 171 ||
+		len(body.Levels) != 189 ||
 		body.Levels[0].Key != "foundation/1" ||
-		body.LegacyProgress.ExerciseKeys[0] != body.Levels[0].Key {
+		body.LegacyProgress.ExerciseKeys[0] != body.Levels[0].Key ||
+		body.Levels[len(body.Levels)-1].Key != "advanced/18" {
 		t.Fatalf("unexpected catalogue manifest: %#v", body)
 	}
 }

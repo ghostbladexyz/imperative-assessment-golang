@@ -1,4 +1,5 @@
 import type {
+  AssessmentTrack,
   Catalogue,
   ExerciseKey,
   ExerciseProgress,
@@ -55,6 +56,7 @@ export function createProgress(catalogue: Catalogue): SavedProgress {
     schemaVersion: catalogue.progressSchemaVersion,
     updatedAt: Date.now(),
     currentExerciseKey: first.key,
+    trackExerciseKeys: firstExerciseKeys(catalogue.levels),
     exercises: Object.fromEntries(
       catalogue.levels.map((level) => [level.key, makeExerciseProgress(level)]),
     ),
@@ -102,6 +104,11 @@ function reconcileCurrent(
   )
     ? requestedKey
     : clean.currentExerciseKey;
+  reconcileTrackExerciseKeys(clean, value.trackExerciseKeys, catalogue.levels);
+  const selected = catalogue.levels.find(
+    (level) => level.key === clean.currentExerciseKey,
+  );
+  if (selected) clean.trackExerciseKeys[selected.track] = selected.key;
   reconcileExercises(clean, value.exercises, catalogue.levels, (level) => level.key);
   reconcileSharedState(clean, value);
   return clean;
@@ -126,6 +133,8 @@ function migrateLegacyProgress(
     catalogue.levels.some((level) => level.key === requestedKey)
   ) {
     clean.currentExerciseKey = requestedKey;
+    const selected = catalogue.levels.find((level) => level.key === requestedKey);
+    if (selected) clean.trackExerciseKeys[selected.track] = selected.key;
   }
   const legacyPositionByKey = new Map(
     catalogue.legacyProgress.exerciseKeys.map((key, index) => [key, index + 1]),
@@ -136,6 +145,34 @@ function migrateLegacyProgress(
   });
   reconcileSharedState(clean, value);
   return clean;
+}
+
+// firstExerciseKeys records each track's independent entry point so switching never depends on another track.
+function firstExerciseKeys(levels: Level[]): Record<AssessmentTrack, ExerciseKey> {
+  const first = new Map<AssessmentTrack, ExerciseKey>();
+  for (const level of levels) {
+    if (!first.has(level.track)) first.set(level.track, level.key);
+  }
+  return {
+    core: first.get("core") ?? levels[0]?.key ?? "",
+    advanced: first.get("advanced") ?? levels[0]?.key ?? "",
+  };
+}
+
+// reconcileTrackExerciseKeys keeps only keys that still belong to their recorded track after catalogue changes.
+function reconcileTrackExerciseKeys(
+  progress: SavedProgress,
+  value: unknown,
+  levels: Level[],
+): void {
+  if (!isRecord(value)) return;
+  const byKey = new Map(levels.map((level) => [level.key, level]));
+  for (const track of ["core", "advanced"] as const) {
+    const key = value[track];
+    if (typeof key === "string" && byKey.get(key)?.track === track) {
+      progress.trackExerciseKeys[track] = key;
+    }
+  }
 }
 
 function reconcileExercises(
@@ -313,6 +350,12 @@ export function isLevelUnlocked(
   progress: SavedProgress,
 ): boolean {
   if (progress.settings.practiceMode) return true;
-  const index = levels.findIndex((level) => level.key === exerciseKey);
-  return index === 0 || progress.exercises[levels[index - 1]?.key]?.passed === true;
+  const selected = levels.find((level) => level.key === exerciseKey);
+  if (!selected) return false;
+  const trackLevels = levels.filter((level) => level.track === selected.track);
+  const index = trackLevels.findIndex((level) => level.key === exerciseKey);
+  return (
+    index === 0 ||
+    progress.exercises[trackLevels[index - 1]?.key]?.passed === true
+  );
 }

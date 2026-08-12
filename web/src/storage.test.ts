@@ -8,21 +8,36 @@ import {
 } from "./storage";
 import type { Catalogue, Level } from "./types";
 
-const levels = Array.from({ length: 171 }, (_, index) => ({
+const coreLevels = Array.from({ length: 171 }, (_, index) => ({
   key: index < 21 ? `foundation/${index + 1}` : `piscine/${index + 980}`,
   id: index + 1,
+  track: "core",
+  trackPosition: index + 1,
   title: `Exercise ${index + 1}`,
   tests: [{ id: "a" }],
   starterCode: "func solve() {}",
   instructions: { hints: [] },
 })) as unknown as Level[];
 
+const advancedLevels = Array.from({ length: 18 }, (_, index) => ({
+  key: `advanced/${index + 1}`,
+  id: coreLevels.length + index + 1,
+  track: "advanced",
+  trackPosition: index + 1,
+  title: `Advanced ${index + 1}`,
+  tests: [{ id: "a" }],
+  starterCode: "func solve() {}",
+  instructions: { hints: [] },
+})) as unknown as Level[];
+
+const levels = [...coreLevels, ...advancedLevels];
+
 const catalogue: Catalogue = {
   levels,
   progressSchemaVersion: 5,
   legacyProgress: {
     schemaVersion: 4,
-    exerciseKeys: levels.map((level) => level.key),
+    exerciseKeys: coreLevels.map((level) => level.key),
   },
 };
 
@@ -33,6 +48,14 @@ describe("progress state", () => {
     expect(isLevelUnlocked(levels[1].key, levels, progress)).toBe(false);
     progress.exercises[levels[0].key].passed = true;
     expect(isLevelUnlocked(levels[1].key, levels, progress)).toBe(true);
+  });
+
+  it("unlocks the first advanced exercise independently of core progress", () => {
+    const progress = createProgress(catalogue);
+    expect(isLevelUnlocked(advancedLevels[0].key, levels, progress)).toBe(true);
+    expect(isLevelUnlocked(advancedLevels[1].key, levels, progress)).toBe(false);
+    progress.exercises[advancedLevels[0].key].passed = true;
+    expect(isLevelUnlocked(advancedLevels[1].key, levels, progress)).toBe(true);
   });
 
   it("practice mode unlocks every exercise", () => {

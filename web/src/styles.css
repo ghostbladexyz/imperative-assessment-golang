@@ -102,6 +102,43 @@ button:disabled {
   text-transform: uppercase;
 }
 
+.track-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 3px;
+  border: 1px solid var(--line);
+  background: #091019;
+}
+
+.track-switch button {
+  min-width: 96px;
+  height: 26px;
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  color: var(--faint);
+  font: 9px/1 var(--mono);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.track-switch button:hover {
+  color: var(--text);
+}
+
+.track-switch button.active {
+  background: var(--editor-active);
+  color: var(--cyan);
+  box-shadow: inset 0 -2px var(--cyan);
+}
+
+.track-switch span {
+  margin-left: 5px;
+  color: var(--faint);
+  font-size: 8px;
+}
+
 .level-stepper {
   display: flex;
   align-items: center;
@@ -1051,6 +1088,15 @@ body.resizing-output {
 
   .wordmark span {
     font-size: 14px;
+  }
+
+  .track-switch button {
+    min-width: 0;
+    padding-inline: 8px;
+  }
+
+  .track-switch span {
+    display: none;
   }
 
   .level-stepper {

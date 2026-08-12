@@ -159,8 +159,8 @@ func TestCatalogueLookupUsesStableKeysAndFrozenLegacyPositions(t *testing.T) {
 	t.Parallel()
 	levels := Levels()
 	legacy := LegacyExerciseKeys()
-	if len(legacy) != len(levels) {
-		t.Fatalf("got %d legacy keys, want %d", len(legacy), len(levels))
+	if len(legacy) != legacyExerciseCount {
+		t.Fatalf("got %d legacy keys, want frozen count %d", len(legacy), legacyExerciseCount)
 	}
 	for index, level := range levels {
 		byKey, found := FindExercise(level.Key)
@@ -179,6 +179,60 @@ func TestCatalogueLookupUsesStableKeysAndFrozenLegacyPositions(t *testing.T) {
 		key, found := LegacyExerciseKey(position)
 		if !found || key != want {
 			t.Fatalf("legacy position %d maps to %q, want %q", position, key, want)
+		}
+	}
+	if _, found := LegacyExerciseKey(legacyExerciseCount + 1); found {
+		t.Fatal("advanced exercises must not extend the frozen schema-v4 position map")
+	}
+}
+
+// TestAdvancedCatalogueContainsEighteenCapstones keeps the independent track contiguous and visibly classified in the UI.
+func TestAdvancedCatalogueContainsEighteenCapstones(t *testing.T) {
+	t.Parallel()
+	for sourceID := 1; sourceID <= 18; sourceID++ {
+		level, found := FindExercise(exerciseKey(sourceAdvanced, sourceID))
+		if !found {
+			t.Fatalf("missing advanced exercise %d", sourceID)
+		}
+		if level.Difficulty != "Advanced" || !level.Stretch {
+			t.Errorf("advanced exercise %q has difficulty=%q stretch=%t", level.Key, level.Difficulty, level.Stretch)
+		}
+		if level.Track != TrackAdvanced || level.TrackPosition != sourceID {
+			t.Errorf("advanced exercise %q has track=%q position=%d", level.Key, level.Track, level.TrackPosition)
+		}
+	}
+}
+
+// TestCoreTrackPreservesOriginalPositions proves the new track cannot disturb existing learner navigation.
+func TestCoreTrackPreservesOriginalPositions(t *testing.T) {
+	t.Parallel()
+	for position, level := range Levels()[:legacyExerciseCount] {
+		if level.Track != TrackCore || level.TrackPosition != position+1 {
+			t.Fatalf("core exercise %q has track=%q position=%d", level.Key, level.Track, level.TrackPosition)
+		}
+	}
+}
+
+// TestAdvancedSubjectsHaveThreeExercises locks the requested curriculum breadth into the catalogue.
+func TestAdvancedSubjectsHaveThreeExercises(t *testing.T) {
+	t.Parallel()
+	subjectIDs := map[string][]int{
+		"Parsing":     {1, 2, 3},
+		"Error":       {8, 10, 11},
+		"HTTP":        {5, 12, 13},
+		"Algorithms":  {4, 9, 14},
+		"Concurrency": {6, 15, 16},
+		"SQL":         {7, 17, 18},
+	}
+	for subject, sourceIDs := range subjectIDs {
+		if len(sourceIDs) < 3 {
+			t.Fatalf("subject %q has only %d exercises", subject, len(sourceIDs))
+		}
+		for _, sourceID := range sourceIDs {
+			level, found := FindExercise(exerciseKey(sourceAdvanced, sourceID))
+			if !found || !strings.Contains(level.Topic, subject) {
+				t.Errorf("advanced/%d does not represent %s: %q", sourceID, subject, level.Topic)
+			}
 		}
 	}
 }

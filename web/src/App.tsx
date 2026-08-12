@@ -38,7 +38,12 @@ import {
 import { buildConsoleStreams } from "./console";
 import { loadProgress, saveProgress } from "./storage";
 import { constrainDragTop, reorderTests } from "./test-order";
-import type { Level, RunResult, SavedProgress } from "./types";
+import type {
+  AssessmentTrack,
+  Level,
+  RunResult,
+  SavedProgress,
+} from "./types";
 
 type PaneSizes = {
   brief: number;
@@ -145,6 +150,22 @@ function App() {
     () =>
       levels.find((item) => item.key === progress?.currentExerciseKey) ?? levels[0],
     [levels, progress?.currentExerciseKey],
+  );
+  const activeTrack = level?.track ?? "core";
+  const trackLevels = useMemo(
+    () => levels.filter((item) => item.track === activeTrack),
+    [activeTrack, levels],
+  );
+  const trackCounts = useMemo(
+    () => ({
+      core: levels.filter((item) => item.track === "core").length,
+      advanced: levels.filter((item) => item.track === "advanced").length,
+    }),
+    [levels],
+  );
+  const trackIndex = useMemo(
+    () => trackLevels.findIndex((item) => item.key === level?.key),
+    [level?.key, trackLevels],
   );
   const levelProgress =
     progress && level ? progress.exercises[level.key] : undefined;
@@ -325,13 +346,27 @@ function App() {
     );
   };
 
-  const selectLevel = (id: number) => {
-    if (!progress || id < 1 || id > levels.length) return;
-    const selected = levels.find((item) => item.id === id);
-    if (!selected) return;
-    setProgress({ ...progress, currentExerciseKey: selected.key });
+  const selectLevel = (selected: Level | undefined) => {
+    if (!progress || !selected) return;
+    setProgress({
+      ...progress,
+      currentExerciseKey: selected.key,
+      trackExerciseKeys: {
+        ...progress.trackExerciseKeys,
+        [selected.track]: selected.key,
+      },
+    });
     setEditRevision(0);
     lastAutoRevisionRef.current = 0;
+  };
+
+  const switchTrack = (track: AssessmentTrack) => {
+    if (!progress || track === activeTrack) return;
+    const rememberedKey = progress.trackExerciseKeys[track];
+    const selected =
+      levels.find((item) => item.key === rememberedKey && item.track === track) ??
+      levels.find((item) => item.track === track);
+    selectLevel(selected);
   };
 
   const resetCode = () => {
@@ -483,9 +518,11 @@ function App() {
     );
   }
 
-  const canMoveBack = level.id > 1;
+  const canMoveBack = trackIndex > 0;
   const canMoveForward =
-    level.id < levels.length && Boolean(levelProgress.passed);
+    trackIndex >= 0 &&
+    trackIndex < trackLevels.length - 1 &&
+    Boolean(levelProgress.passed);
 
   return (
     <main className="assessment">
@@ -494,20 +531,36 @@ function App() {
           <span>imperative</span>
           <strong>/ go</strong>
         </div>
+        <nav className="track-switch" aria-label="Assessment track">
+          <button
+            className={activeTrack === "core" ? "active" : ""}
+            aria-pressed={activeTrack === "core"}
+            onClick={() => switchTrack("core")}
+          >
+            Core <span>{trackCounts.core}</span>
+          </button>
+          <button
+            className={activeTrack === "advanced" ? "active" : ""}
+            aria-pressed={activeTrack === "advanced"}
+            onClick={() => switchTrack("advanced")}
+          >
+            Advanced <span>{trackCounts.advanced}</span>
+          </button>
+        </nav>
         <div className="level-stepper">
           <button
-            onClick={() => selectLevel(level.id - 1)}
+            onClick={() => selectLevel(trackLevels[trackIndex - 1])}
             disabled={!canMoveBack}
             aria-label="Previous exercise"
           >
             <ArrowLeft />
           </button>
           <span>
-            Exercise {String(level.id).padStart(2, "0")}{" "}
-            <em>/ {String(levels.length).padStart(2, "0")}</em>
+            Exercise {String(level.trackPosition).padStart(2, "0")}{" "}
+            <em>/ {String(trackLevels.length).padStart(2, "0")}</em>
           </span>
           <button
-            onClick={() => selectLevel(level.id + 1)}
+            onClick={() => selectLevel(trackLevels[trackIndex + 1])}
             disabled={!canMoveForward}
             aria-label="Next exercise"
             title={
@@ -729,7 +782,7 @@ function ExerciseBrief({ level, passed }: { level: Level; passed: boolean }) {
   return (
     <aside className="brief">
       <div className="brief-heading">
-        <span>Exercise {String(level.id).padStart(2, "0")}</span>
+        <span>Exercise {String(level.trackPosition).padStart(2, "0")}</span>
         {passed ? <em>passed</em> : <em>{level.difficulty}</em>}
         <h1>{level.title}</h1>
         <code>{level.signature}</code>

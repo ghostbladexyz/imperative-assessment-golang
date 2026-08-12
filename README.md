@@ -1,9 +1,12 @@
 # Imperative Go Practice Assessment
 
-A local, browser-based practice assessment with 171 Go exercises, automatic
-tests, console feedback, and saved progress. It starts with foundational
-problems and progresses through checkpoint-style challenges. Submitted code
-runs in a restricted Docker container by default.
+A local, browser-based practice assessment with 189 Go exercises, automatic
+tests, console feedback, and saved progress. Its independently selectable Core
+and Advanced tracks let learners enter the 18 advanced capstones without first
+completing the 171 foundational and checkpoint exercises. Every advanced
+subject—parsing and data handling, error handling, HTTP, algorithms,
+concurrency, and SQL—contains at least three exercises. Submitted code runs in
+a restricted Docker container by default.
 
 This is an unofficial practice tool and is not affiliated with Zone01.
 Exercises after the 21-level foundation adapt the public

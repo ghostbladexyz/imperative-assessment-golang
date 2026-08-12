@@ -2,6 +2,13 @@ package assessment
 
 type ExerciseKey string
 
+type AssessmentTrack string
+
+const (
+	TrackCore     AssessmentTrack = "core"
+	TrackAdvanced AssessmentTrack = "advanced"
+)
+
 type DocumentationLink struct {
 	Label string `json:"label"`
 	URL   string `json:"url"`
@@ -40,16 +47,18 @@ type VisibleTest struct {
 }
 
 type Level struct {
-	Key           ExerciseKey   `json:"key"`
-	ID            int           `json:"id"`
-	Title         string        `json:"title"`
-	Topic         string        `json:"topic"`
-	Difficulty    string        `json:"difficulty"`
-	Stretch       bool          `json:"stretch"`
-	Signature     string        `json:"signature"`
-	StarterCode   string        `json:"starterCode"`
-	Instructions  Instructions  `json:"instructions"`
-	Tests         []VisibleTest `json:"tests"`
+	Key           ExerciseKey     `json:"key"`
+	ID            int             `json:"id"`
+	Track         AssessmentTrack `json:"track"`
+	TrackPosition int             `json:"trackPosition"`
+	Title         string          `json:"title"`
+	Topic         string          `json:"topic"`
+	Difficulty    string          `json:"difficulty"`
+	Stretch       bool            `json:"stretch"`
+	Signature     string          `json:"signature"`
+	StarterCode   string          `json:"starterCode"`
+	Instructions  Instructions    `json:"instructions"`
+	Tests         []VisibleTest   `json:"tests"`
 	build         func([]VisibleTest) string
 	source        exerciseSource
 	sourceID      int

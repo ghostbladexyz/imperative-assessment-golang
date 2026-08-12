@@ -1,6 +1,7 @@
 export type Theme = "light" | "dark";
 export type RunnerMode = "docker" | "local";
 export type ExerciseKey = string;
+export type AssessmentTrack = "core" | "advanced";
 
 export interface RunnerConfig {
   ok: boolean;
@@ -50,6 +51,8 @@ export interface VisibleTest {
 export interface Level {
   key: ExerciseKey;
   id: number;
+  track: AssessmentTrack;
+  trackPosition: number;
   title: string;
   topic: string;
   difficulty: string;
@@ -145,6 +148,7 @@ export interface SavedProgress {
   schemaVersion: number;
   updatedAt: number;
   currentExerciseKey: ExerciseKey;
+  trackExerciseKeys: Record<AssessmentTrack, ExerciseKey>;
   exercises: Record<ExerciseKey, ExerciseProgress>;
   timer: TimerState;
   settings: Settings;
