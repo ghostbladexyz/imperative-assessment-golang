@@ -102,41 +102,11 @@ button:disabled {
   text-transform: uppercase;
 }
 
-.track-switch {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  padding: 3px;
-  border: 1px solid var(--line);
-  background: #091019;
-}
-
-.track-switch button {
-  min-width: 96px;
-  height: 26px;
-  padding: 0 10px;
-  border: 0;
-  background: transparent;
-  color: var(--faint);
-  font: 9px/1 var(--mono);
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  cursor: pointer;
-}
-
-.track-switch button:hover {
-  color: var(--text);
-}
-
-.track-switch button.active {
-  background: var(--editor-active);
+.checkpoint-label {
   color: var(--cyan);
-  box-shadow: inset 0 -2px var(--cyan);
-}
-
-.track-switch span {
-  margin-left: 5px;
-  color: var(--faint);
-  font-size: 8px;
+  font: 9px/1 var(--mono);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
 }
 
 .level-stepper {
@@ -234,6 +204,77 @@ button:disabled {
 .brief-section {
   padding: 20px 22px;
   border-bottom: 1px solid var(--line);
+}
+
+.subject-markdown {
+  padding: 20px 22px 32px;
+  color: #a8b7c9;
+  font: 12px/1.65 var(--body);
+}
+
+.subject-markdown > :first-child {
+  display: none;
+}
+
+.subject-markdown h2,
+.subject-markdown h3 {
+  margin: 24px 0 10px;
+  color: var(--text);
+  font-family: var(--mono);
+}
+
+.subject-markdown h2 { font-size: 14px; }
+.subject-markdown h3 { font-size: 12px; }
+
+.subject-markdown p,
+.subject-markdown ul,
+.subject-markdown ol {
+  margin: 0 0 14px;
+}
+
+.subject-markdown pre {
+  padding: 11px;
+  overflow: auto;
+  border: 1px solid var(--line-soft);
+  background: #0d151f;
+  color: #b8d7ef;
+  font: 10px/1.55 var(--mono);
+}
+
+.subject-markdown code {
+  color: var(--cyan);
+  font-family: var(--mono);
+}
+
+.subject-markdown pre code { color: inherit; }
+
+.subject-markdown table {
+  width: 100%;
+  margin: 0 0 14px;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.subject-markdown th,
+.subject-markdown td {
+  padding: 7px;
+  border: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.subject-markdown a { color: var(--blue); }
+
+.exercise-resource {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.exercise-resource summary {
+  color: var(--blue);
+  font: 10px/1.4 var(--mono);
+  cursor: pointer;
 }
 
 .brief-section h2 {
@@ -1088,15 +1129,6 @@ body.resizing-output {
 
   .wordmark span {
     font-size: 14px;
-  }
-
-  .track-switch button {
-    min-width: 0;
-    padding-inline: 8px;
-  }
-
-  .track-switch span {
-    display: none;
   }
 
   .level-stepper {

@@ -1,0 +1,81 @@
+package main
+
+import (
+	"fmt"
+	"os"
+	"strconv"
+)
+
+var a, b []int
+var log []string
+
+func do(op string) {
+	log = append(log, op)
+	switch op {
+	case "pa":
+		if len(b) > 0 {
+			a = append([]int{b[0]}, a...)
+			b = b[1:]
+		}
+	case "pb":
+		if len(a) > 0 {
+			b = append([]int{a[0]}, b...)
+			a = a[1:]
+		}
+	case "sa", "ss":
+		if len(a) >= 2 {
+			a[0], a[1] = a[1], a[0]
+		}
+		if op == "sa" {
+			break
+		}
+		fallthrough
+	case "sb":
+		if len(b) >= 2 {
+			b[0], b[1] = b[1], b[0]
+		}
+	case "ra", "rr":
+		if len(a) > 0 {
+			a = append(a[1:], a[0])
+		}
+		if op == "ra" {
+			break
+		}
+		fallthrough
+	case "rb":
+		if len(b) > 0 {
+			b = append(b[1:], b[0])
+		}
+	case "rra", "rrr":
+		if len(a) > 0 {
+			a = append([]int{a[len(a)-1]}, a[:len(a)-1]...)
+		}
+		if op == "rra" {
+			break
+		}
+		fallthrough
+	case "rrb":
+		if len(b) > 0 {
+			b = append([]int{b[len(b)-1]}, b[:len(b)-1]...)
+		}
+	}
+}
+
+func sort() {
+	// TODO: implement sort.
+}
+
+func main() {
+	for _, s := range os.Args[1:] {
+		n, err := strconv.Atoi(s)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Error")
+			os.Exit(1)
+		}
+		a = append(a, n)
+	}
+	sort()
+	for _, op := range log {
+		fmt.Println(op)
+	}
+}

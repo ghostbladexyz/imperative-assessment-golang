@@ -3,31 +3,28 @@ package runner
 import (
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strings"
 	"time"
 
-	"github.com/pleft/imperative-assessment-golang/internal/sandboxprotocol"
+	"github.com/pleft/imperative-assessment-golang/internal/assessment"
 )
 
 const (
-	dockerGoVersion        = "go1.26.5"
-	dockerImageRepository  = "imperative-go-assessment-runner"
-	dockerContainerLabel   = "io.github.pleft.imperative-assessment.role=sandbox"
-	dockerBuildOutputLimit = 2 * 1024 * 1024
-	dockerRunOutputLimit   = 2 * 1024 * 1024
-	dockerCleanupTimeout   = 5 * time.Second
-	dockerHostTimeout      = CompileTimeout + RuntimeTimeout + 15*time.Second
+	dockerGoVersion      = "official grader toolchain"
+	dockerImage          = "ghcr.io/zone01athens/test-imperative-checkpoint@sha256:6d3501ebb37c4c268177edaa7a0490e601898a25f6426310ad59fae85254b0d7"
+	dockerContainerLabel = "io.github.pleft.imperative-assessment.role=official-grader"
+	dockerRunOutputLimit = 4 * 1024 * 1024
+	dockerCleanupTimeout = 5 * time.Second
+	dockerHostTimeout    = 90 * time.Second
+	dockerStartupTimeout = 10 * time.Minute
 )
 
 var containerNamePattern = regexp.MustCompile(`^imperative-go-assessment-[a-f0-9]{24}$`)
@@ -52,7 +49,7 @@ func (processExecutor) Run(ctx context.Context, outputLimit int, stdin []byte, n
 
 type DockerOptions struct {
 	DockerBinary  string
-	ProjectRoot   string
+	ProjectRoot   string // Retained for API compatibility; the official image needs no build context.
 	MaxConcurrent int
 	Receipts      ReceiptIssuer
 	Commands      CommandExecutor
@@ -62,7 +59,6 @@ type DockerOptions struct {
 
 type dockerAdapter struct {
 	dockerBinary string
-	image        string
 	commands     CommandExecutor
 	random       io.Reader
 }
@@ -78,7 +74,7 @@ func NewDocker(ctx context.Context, options DockerOptions) (*Engine, error) {
 		options.Random = rand.Reader
 	}
 	if options.BuildTimeout <= 0 {
-		options.BuildTimeout = 10 * time.Minute
+		options.BuildTimeout = dockerStartupTimeout
 	}
 	if err := CheckDocker(ctx, options.Commands, options.DockerBinary); err != nil {
 		return nil, err
@@ -86,96 +82,23 @@ func NewDocker(ctx context.Context, options DockerOptions) (*Engine, error) {
 	if err := cleanupStaleContainers(ctx, options.Commands, options.DockerBinary); err != nil {
 		return nil, err
 	}
-	root := options.ProjectRoot
-	if root == "" {
-		var err error
-		root, err = findProjectRoot()
-		if err != nil {
-			return nil, err
-		}
-	}
-	hash, err := imageInputHash(root)
-	if err != nil {
-		return nil, fmt.Errorf("inspect Docker sandbox inputs: %w", err)
-	}
-	image := dockerImageRepository + ":" + hash
-	cached := options.Commands.Run(
-		ctx,
-		64*1024,
-		nil,
-		options.DockerBinary,
-		"image",
-		"inspect",
-		"--format",
-		"{{.Id}}",
-		image,
-	)
-	if cached.Err != nil {
-		buildCtx, cancelBuild := context.WithTimeout(ctx, options.BuildTimeout)
-		defer cancelBuild()
-		built := options.Commands.Run(
-			buildCtx,
-			dockerBuildOutputLimit,
-			nil,
-			options.DockerBinary,
-			dockerBuildArgs(root, image)...,
-		)
-		if built.Err != nil {
-			switch {
-			case errors.Is(buildCtx.Err(), context.DeadlineExceeded):
-				return nil, errors.New("the Docker sandbox image build timed out; restart Docker Desktop and try again")
-			case built.OutputLimited:
-				return nil, errors.New("the Docker sandbox image build produced too much output; check Docker Desktop and try again")
-			default:
-				return nil, errors.New("the Docker sandbox image could not be built; verify Docker Desktop has network access for the first build and try again")
+	inspect := options.Commands.Run(ctx, 64*1024, nil, options.DockerBinary, "image", "inspect", "--format", "{{.Id}}", dockerImage)
+	if inspect.Err != nil {
+		pullCtx, cancel := context.WithTimeout(ctx, options.BuildTimeout)
+		defer cancel()
+		pull := options.Commands.Run(pullCtx, dockerRunOutputLimit, nil, options.DockerBinary, "pull", dockerImage)
+		if pull.Err != nil {
+			if errors.Is(pullCtx.Err(), context.DeadlineExceeded) {
+				return nil, errors.New("downloading the pinned official grader timed out")
 			}
+			return nil, errors.New("the pinned official Zone01 grader could not be downloaded")
 		}
 	}
-	return newEngine(&dockerAdapter{
-		dockerBinary: options.DockerBinary,
-		image:        image,
-		commands:     options.Commands,
-		random:       options.Random,
-	}, options.MaxConcurrent, options.Receipts), nil
-}
-
-func cleanupStaleContainers(ctx context.Context, commands CommandExecutor, dockerBinary string) error {
-	found := commands.Run(
-		ctx,
-		64*1024,
-		nil,
-		dockerBinary,
-		"ps",
-		"--all",
-		"--filter",
-		"label="+dockerContainerLabel,
-		"--filter",
-		"status=created",
-		"--filter",
-		"status=exited",
-		"--filter",
-		"status=dead",
-		"--format",
-		"{{.Names}}",
-	)
-	if found.Err != nil {
-		return errors.New("the Docker sandbox could not check for stale containers")
-	}
-	cleaner := &dockerAdapter{dockerBinary: dockerBinary, commands: commands}
-	for _, name := range strings.Fields(found.Stdout) {
-		if !containerNamePattern.MatchString(name) {
-			return errors.New("the Docker sandbox found an invalid stale container name")
-		}
-		if err := cleaner.cleanup(name); err != nil {
-			return errors.New("the Docker sandbox could not remove a stale container")
-		}
-	}
-	return nil
+	return newEngine(&dockerAdapter{dockerBinary: options.DockerBinary, commands: options.Commands, random: options.Random}, options.MaxConcurrent, options.Receipts), nil
 }
 
 func CheckDocker(ctx context.Context, commands CommandExecutor, dockerBinary string) error {
-	cli := commands.Run(ctx, 64*1024, nil, dockerBinary, "--version")
-	if cli.Err != nil {
+	if cli := commands.Run(ctx, 64*1024, nil, dockerBinary, "--version"); cli.Err != nil {
 		return errors.New("Docker CLI is unavailable. Install Docker Desktop, then rerun the assessment")
 	}
 	daemon := commands.Run(ctx, 64*1024, nil, dockerBinary, "info", "--format", "{{.ServerVersion}}")
@@ -186,125 +109,227 @@ func CheckDocker(ctx context.Context, commands CommandExecutor, dockerBinary str
 }
 
 func (docker *dockerAdapter) Info() Info {
-	return Info{
-		Mode:         ModeDocker,
-		SandboxReady: true,
-		GoVersion:    dockerGoVersion,
-		DockerImage:  docker.image,
-		Message:      "Docker sandbox ready. Each run uses a fresh, restricted container.",
-	}
+	return Info{Mode: ModeDocker, SandboxReady: true, GoVersion: dockerGoVersion, DockerImage: dockerImage,
+		Message: "Pinned official Zone01 grader ready. Each run uses a fresh restricted container."}
 }
 
 func (docker *dockerAdapter) Execute(ctx context.Context, plan executionPlan) executionOutcome {
 	name, err := newContainerName(docker.random)
 	if err != nil {
-		return executionOutcome{
-			status: executionInternal, runtimeError: "The sandbox could not create a unique run identifier.",
-		}
+		return executionOutcome{status: executionInternal, runtimeError: "The grader could not create a unique run identifier."}
 	}
-	tests := make([]sandboxprotocol.ExpectedTest, 0, len(plan.tests))
-	for _, test := range plan.tests {
-		tests = append(tests, sandboxprotocol.ExpectedTest{ID: test.ID, Expected: test.Expected})
-	}
-	request := sandboxprotocol.Request{
-		Source:           plan.prepared,
-		Harness:          plan.harness,
-		Tests:            tests,
-		CompileTimeoutMS: CompileTimeout.Milliseconds(),
-		RuntimeTimeoutMS: RuntimeTimeout.Milliseconds(),
-		OutputLimitBytes: MaxOutputBytes,
-	}
-	payload, err := json.Marshal(request)
+	directory, err := os.MkdirTemp("", "imperative-official-grader-")
 	if err != nil {
-		return executionOutcome{
-			status: executionInternal, runtimeError: "The sandbox request could not be prepared.",
-		}
+		return executionOutcome{status: executionInternal, runtimeError: "The grader could not prepare the submitted source."}
+	}
+	defer os.RemoveAll(directory)
+	sourcePath := filepath.Join(directory, "main.go")
+	if err := os.WriteFile(sourcePath, []byte(plan.prepared), 0o600); err != nil {
+		return executionOutcome{status: executionInternal, runtimeError: "The grader could not prepare the submitted source."}
 	}
 
-	runCtx, cancelRun := context.WithTimeout(ctx, dockerHostTimeout)
-	commandResult := docker.commands.Run(
-		runCtx,
-		dockerRunOutputLimit,
-		payload,
-		docker.dockerBinary,
-		dockerRunArgs(name, docker.image)...,
-	)
-	cancelRun()
-
+	runCtx, cancel := context.WithTimeout(ctx, dockerHostTimeout)
+	command := docker.commands.Run(runCtx, dockerRunOutputLimit, nil, docker.dockerBinary,
+		dockerRunArgs(name, string(plan.level.Key), sourcePath)...)
+	cancel()
 	cleanupErr := docker.cleanup(name)
 	if cleanupErr != nil {
-		return executionOutcome{
-			status:       executionCleanup,
-			runtimeError: "The sandbox container could not be removed. Close Docker Desktop and remove only the named assessment container before trying again.",
-		}
+		return executionOutcome{status: executionCleanup, runtimeError: "The official grader container could not be removed."}
 	}
 	if errors.Is(ctx.Err(), context.Canceled) {
 		return executionOutcome{status: executionStopped}
 	}
 	if errors.Is(runCtx.Err(), context.DeadlineExceeded) {
-		return executionOutcome{
-			status:       executionStartup,
-			runtimeError: "The sandbox did not finish within its overall time limit and was terminated.",
+		return executionOutcome{status: executionRuntimeTimeout, runtimeError: "The official grader exceeded its 90 second host limit."}
+	}
+	if command.OutputLimited {
+		return executionOutcome{status: executionOutput, runtimeError: "Official grader output exceeded the response limit."}
+	}
+	outcome, err := decodeOfficialOutcome(plan.level, command.Stdout, command.Stderr)
+	if err != nil {
+		message := "The official grader returned an invalid response."
+		if command.Err != nil {
+			message = "The official grader container could not start."
 		}
-	}
-	if commandResult.OutputLimited {
-		return executionOutcome{
-			status:       executionOutput,
-			runtimeError: "Sandbox output exceeded the response limit and execution was terminated.",
-		}
-	}
-
-	response, decodeErr := decodeSandboxResponse(commandResult.Stdout)
-	if decodeErr != nil {
-		message := "The sandbox returned an invalid response. Restart the assessment server and try again."
-		if commandResult.Err != nil {
-			message = "The sandbox container could not start. Restart Docker Desktop and try again."
-		}
-		return executionOutcome{status: executionStartup, runtimeError: message}
-	}
-	if err := response.Validate(tests); err != nil {
-		return executionOutcome{
-			status: executionInternal, runtimeError: "The sandbox returned an invalid test result.",
-		}
-	}
-
-	wires := make([]wireResult, 0, len(response.Results))
-	for _, item := range response.Results {
-		wires = append(wires, wireResult{
-			ID: item.ID, Actual: item.Actual, Failure: item.Failure,
-			Stdout: item.Stdout, DurationMS: item.DurationMS,
-		})
-	}
-	outcome := executionOutcome{
-		status:          executionSuccess,
-		compileError:    response.CompileError,
-		runtimeError:    response.RuntimeError,
-		stdout:          response.Stdout,
-		stderr:          response.Stderr,
-		formattedSource: response.FormattedSource,
-		results:         wires,
-	}
-	switch response.Status {
-	case sandboxprotocol.StatusCompileTimeout:
-		outcome.status = executionCompileTimeout
-	case sandboxprotocol.StatusCompile:
-		outcome.status = executionCompile
-	case sandboxprotocol.StatusRuntimeTimeout:
-		outcome.status = executionRuntimeTimeout
-	case sandboxprotocol.StatusStopped:
-		outcome.status = executionStopped
-	case sandboxprotocol.StatusOutput:
-		outcome.status = executionOutput
-	case sandboxprotocol.StatusInternal:
-		outcome.status = executionInternal
-		if outcome.runtimeError == "" {
-			outcome.runtimeError = "The sandbox could not complete this run."
-		}
-	case sandboxprotocol.StatusRuntime:
-		outcome.status = executionRuntime
-	case sandboxprotocol.StatusSuccess, sandboxprotocol.StatusAssertion:
+		return executionOutcome{status: executionStartup, runtimeError: message, stdout: command.Stdout, stderr: command.Stderr}
 	}
 	return outcome
+}
+
+type officialEnvelope struct {
+	OK     bool   `json:"Ok"`
+	Output string `json:"Output"`
+}
+
+func decodeOfficialOutcome(level assessment.Level, stdout, stderr string) (executionOutcome, error) {
+	normalized := strings.ReplaceAll(stdout, "\r\n", "\n")
+	if strings.Contains(normalized, "Reason: code does not compile") {
+		return executionOutcome{
+			status: executionCompile, compileError: strings.TrimSpace(normalized),
+			stdout: strings.TrimSpace(normalized), stderr: strings.TrimSpace(stderr),
+		}, nil
+	}
+	lines := strings.Split(strings.TrimSpace(normalized), "\n")
+	if len(lines) == 0 {
+		return executionOutcome{}, errors.New("empty grader response")
+	}
+	var envelope officialEnvelope
+	if err := json.Unmarshal([]byte(lines[len(lines)-1]), &envelope); err != nil {
+		return executionOutcome{}, err
+	}
+	human := strings.TrimSpace(strings.Join(lines[:len(lines)-1], "\n"))
+	outcome := executionOutcome{status: executionSuccess, stdout: compactOfficialOutput(human), stderr: strings.TrimSpace(stderr)}
+	if strings.Contains(envelope.Output, "Reason: code does not compile") || strings.Contains(human, "Reason: code does not compile") {
+		outcome.status = executionCompile
+		outcome.compileError = strings.TrimSpace(envelope.Output)
+		return outcome, nil
+	}
+	humanLines := strings.Split(human, "\n")
+	for lineIndex, line := range humanLines {
+		status, label, found := officialResultLine(line)
+		if !found {
+			continue
+		}
+		for _, test := range level.Tests {
+			if !test.MatchesOfficialLabel(label) {
+				continue
+			}
+			wire := wireResult{ID: test.ID, Actual: "fail", Input: officialObservedInput(humanLines, lineIndex)}
+			if status == "PASS" {
+				wire.Actual = "pass"
+			} else {
+				wire.Failure = officialFailureReason(line)
+			}
+			outcome.results = upsertWire(outcome.results, wire)
+			break
+		}
+	}
+	if len(level.Tests) == 1 && len(outcome.results) == 0 {
+		wire := wireResult{ID: level.Tests[0].ID, Actual: "fail", Failure: "Official grader suite failed."}
+		if envelope.OK {
+			wire.Actual, wire.Failure = "pass", ""
+		}
+		outcome.results = append(outcome.results, wire)
+	}
+	if len(outcome.results) == 0 {
+		return executionOutcome{}, errors.New("grader response contained no recognized checks")
+	}
+	return outcome, nil
+}
+
+func compactOfficialOutput(output string) string {
+	var kept []string
+	for _, line := range strings.Split(strings.ReplaceAll(output, "\r\n", "\n"), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		if status, label, found := officialResultLine(line); found {
+			kept = append(kept, status+" "+label)
+			continue
+		}
+		lower := strings.ToLower(trimmed)
+		if strings.HasPrefix(trimmed, "Exercise:") || strings.HasPrefix(trimmed, "RESULT:") ||
+			strings.HasPrefix(trimmed, "Summary:") || strings.HasPrefix(lower, "replay seed:") ||
+			strings.HasPrefix(trimmed, "Reason:") || strings.HasPrefix(trimmed, "== total:") {
+			kept = append(kept, trimmed)
+		}
+	}
+	return strings.Join(kept, "\n")
+}
+
+func officialFailureReason(line string) string {
+	trimmed := strings.TrimSpace(line)
+	if index := strings.Index(trimmed, " — "); index >= 0 {
+		return strings.TrimSpace(trimmed[index+len(" — "):])
+	}
+	return "official check failed"
+}
+
+func officialObservedInput(lines []string, resultLine int) string {
+	for index := resultLine + 1; index < len(lines); index++ {
+		if _, _, found := officialResultLine(lines[index]); found {
+			break
+		}
+		trimmed := strings.TrimSpace(lines[index])
+		if !strings.HasPrefix(trimmed, "Input (") {
+			continue
+		}
+		var values []string
+		for index++; index < len(lines); index++ {
+			value := strings.TrimSpace(lines[index])
+			if !strings.HasPrefix(value, "|") {
+				break
+			}
+			value = strings.TrimSpace(strings.TrimPrefix(value, "|"))
+			if value != "(empty)" {
+				values = append(values, value)
+			}
+		}
+		if len(values) == 0 {
+			return "(empty)"
+		}
+		return strings.Join(values, "\n")
+	}
+	return ""
+}
+
+func officialResultLine(line string) (status, label string, found bool) {
+	trimmed := strings.TrimSpace(line)
+	for _, candidate := range []string{"PASS", "FAIL"} {
+		if !strings.HasPrefix(trimmed, candidate+" ") {
+			continue
+		}
+		label = strings.TrimSpace(strings.TrimPrefix(trimmed, candidate))
+		for _, marker := range []string{" [", " —", " --"} {
+			if index := strings.Index(label, marker); index >= 0 {
+				label = strings.TrimSpace(label[:index])
+			}
+		}
+		return candidate, label, label != ""
+	}
+	return "", "", false
+}
+
+func upsertWire(items []wireResult, wire wireResult) []wireResult {
+	for index := range items {
+		if items[index].ID == wire.ID {
+			if wire.Actual == "fail" {
+				items[index] = wire
+			}
+			return items
+		}
+	}
+	return append(items, wire)
+}
+
+func dockerRunArgs(name, exerciseKey, sourcePath string) []string {
+	slug := strings.TrimPrefix(exerciseKey, "checkpoint/")
+	target := "/jail/student/" + slug + "/main.go"
+	return []string{
+		"run", "--name", name, "--label", dockerContainerLabel, "--rm", "--pull", "never",
+		"--network", "none", "--ipc", "none", "--read-only", "--log-driver", "none", "--hostname", "grader",
+		"--memory", "512m", "--memory-swap", "512m", "--cpus", "1", "--pids-limit", "256",
+		"--ulimit", "nofile=256:256", "--ulimit", "core=0:0",
+		"--tmpfs", "/tmp:rw,exec,nosuid,nodev,size=256m,mode=1777",
+		"--env", "EXERCISE=" + slug, "--env", "FILE=" + slug + "/main.go", "--env", "EMIT_JSON=1",
+		"--mount", "type=bind,source=" + sourcePath + ",target=" + target + ",readonly", dockerImage,
+	}
+}
+
+func cleanupStaleContainers(ctx context.Context, commands CommandExecutor, dockerBinary string) error {
+	found := commands.Run(ctx, 64*1024, nil, dockerBinary, "ps", "--all", "--filter", "label="+dockerContainerLabel,
+		"--filter", "status=created", "--filter", "status=exited", "--filter", "status=dead", "--format", "{{.Names}}")
+	if found.Err != nil {
+		return errors.New("the Docker grader could not check for stale containers")
+	}
+	cleaner := &dockerAdapter{dockerBinary: dockerBinary, commands: commands}
+	for _, name := range strings.Fields(found.Stdout) {
+		if !containerNamePattern.MatchString(name) || cleaner.cleanup(name) != nil {
+			return errors.New("the Docker grader could not remove a stale container")
+		}
+	}
+	return nil
 }
 
 func (docker *dockerAdapter) cleanup(name string) error {
@@ -313,28 +338,11 @@ func (docker *dockerAdapter) cleanup(name string) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), dockerCleanupTimeout)
 	defer cancel()
-	cleanup := docker.commands.Run(ctx, 64*1024, nil, docker.dockerBinary, "rm", "--force", name)
-	if cleanup.Err == nil {
-		return nil
-	}
-	combined := cleanup.Stdout + "\n" + cleanup.Stderr
-	if strings.Contains(combined, "No such container") || strings.Contains(combined, "not found") {
+	result := docker.commands.Run(ctx, 64*1024, nil, docker.dockerBinary, "rm", "--force", name)
+	if result.Err == nil || strings.Contains(result.Stdout+result.Stderr, "No such container") {
 		return nil
 	}
 	return errors.New("container cleanup failed")
-}
-
-func decodeSandboxResponse(raw string) (sandboxprotocol.Response, error) {
-	var response sandboxprotocol.Response
-	decoder := json.NewDecoder(strings.NewReader(raw))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&response); err != nil {
-		return response, err
-	}
-	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
-		return response, errors.New("sandbox response must contain exactly one JSON value")
-	}
-	return response, nil
 }
 
 func newContainerName(random io.Reader) (string, error) {
@@ -344,126 +352,7 @@ func newContainerName(random io.Reader) (string, error) {
 	}
 	name := "imperative-go-assessment-" + hex.EncodeToString(value)
 	if !containerNamePattern.MatchString(name) {
-		return "", errors.New("generated invalid container name")
+		return "", fmt.Errorf("generated invalid container name")
 	}
 	return name, nil
-}
-
-func dockerRunArgs(name, image string) []string {
-	return []string{
-		"run",
-		"--name", name,
-		"--label", dockerContainerLabel,
-		"--rm",
-		"--interactive",
-		"--pull", "never",
-		"--network", "none",
-		"--ipc", "none",
-		"--read-only",
-		"--cap-drop", "ALL",
-		"--security-opt", "no-new-privileges",
-		"--log-driver", "none",
-		"--hostname", "sandbox",
-		"--memory", "256m",
-		"--memory-swap", "256m",
-		"--cpus", "1",
-		"--pids-limit", "64",
-		"--ulimit", "nofile=128:128",
-		"--ulimit", "core=0:0",
-		"--tmpfs", "/tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777",
-		"--tmpfs", "/tmp/go-build:rw,noexec,nosuid,nodev,size=96m,uid=65532,gid=65532,mode=0700",
-		"--tmpfs", "/workspace:rw,exec,nosuid,nodev,size=32m,uid=65532,gid=65532,mode=0700",
-		"--user", "65532:65532",
-		"--env", "CGO_ENABLED=0",
-		"--env", "HOME=/tmp",
-		"--env", "GOCACHE=/tmp/go-build",
-		"--env", "GOENV=off",
-		"--env", "GOTMPDIR=/tmp",
-		"--env", "GOPATH=/tmp/go",
-		"--env", "GOPROXY=off",
-		"--env", "GOTOOLCHAIN=local",
-		"--env", "GOTELEMETRY=off",
-		"--env", "GOMAXPROCS=1",
-		"--env", "GOMEMLIMIT=128MiB",
-		"--env", "GOGC=50",
-		"--workdir", "/workspace",
-		image,
-	}
-}
-
-func dockerBuildArgs(root, image string) []string {
-	return []string{
-		"build",
-		"--network", "none",
-		"--file", filepath.Join(root, "docker", "runner.Dockerfile"),
-		"--tag", image,
-		root,
-	}
-}
-
-func findProjectRoot() (string, error) {
-	current, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-	for {
-		if regularFile(filepath.Join(current, "go.mod")) &&
-			regularFile(filepath.Join(current, "docker", "runner.Dockerfile")) {
-			return current, nil
-		}
-		parent := filepath.Dir(current)
-		if parent == current {
-			return "", errors.New("could not find the project root containing docker/runner.Dockerfile")
-		}
-		current = parent
-	}
-}
-
-func regularFile(path string) bool {
-	info, err := os.Stat(path)
-	return err == nil && info.Mode().IsRegular()
-}
-
-func imageInputHash(root string) (string, error) {
-	inputs := []string{
-		".dockerignore",
-		"go.mod",
-		filepath.Join("docker", "runner.Dockerfile"),
-	}
-	for _, directory := range []string{
-		filepath.Join("cmd", "sandbox-runner"),
-		filepath.Join("internal", "sandboxprotocol"),
-		filepath.Join("third_party", "z01"),
-	} {
-		err := filepath.WalkDir(filepath.Join(root, directory), func(path string, entry fs.DirEntry, walkErr error) error {
-			if walkErr != nil {
-				return walkErr
-			}
-			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".go") {
-				relative, err := filepath.Rel(root, path)
-				if err != nil {
-					return err
-				}
-				inputs = append(inputs, relative)
-			}
-			return nil
-		})
-		if err != nil {
-			return "", err
-		}
-	}
-	sort.Strings(inputs)
-	hash := sha256.New()
-	for _, relative := range inputs {
-		content, err := os.ReadFile(filepath.Join(root, relative))
-		if err != nil {
-			return "", err
-		}
-		normalized := filepath.ToSlash(relative)
-		_, _ = io.WriteString(hash, normalized)
-		_, _ = hash.Write([]byte{0})
-		_, _ = hash.Write(content)
-		_, _ = hash.Write([]byte{0})
-	}
-	return hex.EncodeToString(hash.Sum(nil))[:20], nil
 }

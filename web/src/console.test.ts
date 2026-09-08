@@ -21,7 +21,7 @@ const tests: Level["tests"] = [
 
 function run(overrides: Partial<RunResult>): RunResult {
   return {
-    exerciseKey: "foundation/1",
+    exerciseKey: "checkpoint/validate-stack",
     levelId: 1,
     passed: false,
     passedCount: 0,
@@ -86,7 +86,7 @@ describe("buildConsoleStreams", () => {
       { label: "output", value: "hello", error: false },
       {
         label: "test #1 failed: Empty input",
-        value: 'Need: ["hi"], Actual: []',
+		value: 'Input: ""\nNeed: ["hi"]\nGot: []',
         error: true,
       },
     ]);
@@ -120,7 +120,7 @@ describe("buildConsoleStreams", () => {
     expect(streams).toEqual([
       {
         label: "test #1 failed: Empty input",
-        value: 'Need: ["hi"], Actual: false',
+		value: 'Input: ""\nNeed: ["hi"]\nGot: false',
         error: true,
       },
     ]);

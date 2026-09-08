@@ -1,0 +1,29 @@
+package main
+
+import (
+	"fmt"
+	"net/http"
+	"os"
+)
+
+// PROVIDED: mux/listener wiring. Complete only the two handlers.
+func rootHandler(w http.ResponseWriter, r *http.Request) {
+	// TODO: implement rootHandler.
+}
+func submitHandler(w http.ResponseWriter, r *http.Request) {
+	// TODO: implement submitHandler.
+}
+func main() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", rootHandler)
+	mux.HandleFunc("/submit", submitHandler)
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	if err := http.ListenAndServe("127.0.0.1:"+port, mux); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}

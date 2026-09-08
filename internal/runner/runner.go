@@ -26,7 +26,6 @@ type Mode string
 
 const (
 	ModeDocker Mode = "docker"
-	ModeLocal  Mode = "local"
 )
 
 const (
@@ -109,7 +108,6 @@ type executionPlan struct {
 	level      assessment.Level
 	tests      []assessment.VisibleTest
 	prepared   string
-	harness    string
 	sourceHash string
 }
 
@@ -302,6 +300,11 @@ func prepareRun(level assessment.Level, source string, testIDs []string, started
 		result.DurationMS = elapsedMS(started)
 		return result, executionPlan{}, false
 	}
+	if len(selected) != len(level.Tests) {
+		result.CompileError = "The official grader always runs the complete exercise suite."
+		result.DurationMS = elapsedMS(started)
+		return result, executionPlan{}, false
+	}
 	result.TotalCount = len(selected)
 	for _, current := range selected {
 		result.Results = append(result.Results, TestResult{
@@ -321,7 +324,6 @@ func prepareRun(level assessment.Level, source string, testIDs []string, started
 		level:      level,
 		tests:      selected,
 		prepared:   prepared,
-		harness:    level.BuildHarness(selected),
 		sourceHash: result.SourceHash,
 	}, true
 }
@@ -334,18 +336,30 @@ func applyWireResults(result *RunResult, items []wireResult) {
 	for index := range result.Results {
 		wire, found := byID[result.Results[index].ID]
 		if !found {
-			result.Results[index].Status = "runtime"
-			result.Results[index].Failure = "The program stopped before this test produced a result."
+			if len(items) > 0 {
+				result.Results[index].Status = "not_run"
+				result.Results[index].Failure = "The official grader stopped after an earlier failure."
+			} else {
+				result.Results[index].Status = "runtime"
+				result.Results[index].Failure = "The program stopped before this test produced a result."
+			}
 			continue
 		}
 		result.Results[index].Actual = wire.Actual
+		if wire.Input != "" {
+			result.Results[index].Input = wire.Input
+		}
 		result.Results[index].DurationMS = wire.DurationMS
 		result.Results[index].Failure = wire.Failure
 		if wire.Failure != "" {
-			result.Results[index].Status = "runtime"
+			if wire.Actual != "" {
+				result.Results[index].Status = "assertion"
+			} else {
+				result.Results[index].Status = "runtime"
+			}
 			continue
 		}
-		if wire.Actual == result.Results[index].Expected {
+		if wire.Actual == "pass" {
 			result.Results[index].Passed = true
 			result.Results[index].Status = "pass"
 			result.PassedCount++
@@ -357,6 +371,7 @@ func applyWireResults(result *RunResult, items []wireResult) {
 
 type wireResult struct {
 	ID         string  `json:"id"`
+	Input      string  `json:"input,omitempty"`
 	Actual     string  `json:"actual"`
 	Failure    string  `json:"failure"`
 	Stdout     string  `json:"stdout,omitempty"`
@@ -375,7 +390,7 @@ func selectedTestStdout(results []TestResult, wires []wireResult) (string, bool)
 		}
 	}
 	for _, wire := range wires {
-		if wire.ID == selectedID {
+		if wire.ID == selectedID && wire.Stdout != "" {
 			return wire.Stdout, true
 		}
 	}
@@ -395,8 +410,6 @@ func cleanCompilerError(message string) string {
 	for index, line := range lines {
 		if marker := strings.Index(line, "/solution.go:"); marker >= 0 {
 			lines[index] = "solution.go:" + line[marker+len("/solution.go:"):]
-		} else if marker := strings.Index(line, "/assessment_harness.go:"); marker >= 0 {
-			lines[index] = "assessment tests:" + line[marker+len("/assessment_harness.go:"):]
 		}
 	}
 	cleaned := strings.Join(lines, "\n")

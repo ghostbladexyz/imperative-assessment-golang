@@ -1,0 +1,47 @@
+package runner
+
+import (
+	"strings"
+	"testing"
+)
+
+func TestDecodeOfficialOutcomeMapsPassesAndFailures(t *testing.T) {
+	level := mustExercise(t, "checkpoint/validate-stack")
+	human := "Exercise: validate-stack\nRESULT: FAIL\n\n  PASS tp4/distinct_ok [accepted]\n  FAIL tp4/duplicate [rejected] — wrong exit\n        Input (7 bytes; trailing newline: no):\n        | 1 2 2 3\n        Expected stdout (0 bytes):\n        | (empty)\n\nSummary: 1 passed, 1 failed"
+	raw := human + "\n{\"Ok\":false,\"Output\":\"details\"}\n"
+	outcome, err := decodeOfficialOutcome(level, raw, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(outcome.results) != 2 || outcome.results[0].Actual != "pass" || outcome.results[1].Actual != "fail" {
+		t.Fatalf("unexpected mapped results %#v", outcome.results)
+	}
+	if outcome.results[1].Input != "1 2 2 3" || strings.Contains(outcome.stdout, "Expected stdout") {
+		t.Fatalf("official output was not compacted: %#v", outcome)
+	}
+	if outcome.stdout != "Exercise: validate-stack\nRESULT: FAIL\nPASS tp4/distinct_ok\nFAIL tp4/duplicate\nSummary: 1 passed, 1 failed" {
+		t.Fatalf("unexpected compact output %q", outcome.stdout)
+	}
+}
+
+func TestDecodeOfficialOutcomeMapsAggregateFailure(t *testing.T) {
+	level := mustExercise(t, "checkpoint/push-swap")
+	raw := "Exercise: push-swap\nRESULT: FAIL\n  FAIL al3/case-93 — too many operations\n{\"Ok\":false,\"Output\":\"details\"}\n"
+	outcome, err := decodeOfficialOutcome(level, raw, "")
+	if err != nil || len(outcome.results) != 1 || outcome.results[0].Actual != "fail" {
+		t.Fatalf("aggregate mapping = %#v, %v", outcome, err)
+	}
+}
+
+func TestDockerRunUsesOnlyExactSourceMountAndPinnedImage(t *testing.T) {
+	args := dockerRunArgs("imperative-go-assessment-0123456789abcdef01234567", "checkpoint/validate-stack", `C:\\tmp\\main.go`)
+	joined := strings.Join(args, " ")
+	for _, required := range []string{dockerImage, "--network none", "--read-only", "EMIT_JSON=1", "target=/jail/student/validate-stack/main.go,readonly"} {
+		if !strings.Contains(joined, required) {
+			t.Errorf("missing %q in %s", required, joined)
+		}
+	}
+	if strings.Contains(joined, "docker.sock") || strings.Contains(joined, "target=/workspace") {
+		t.Fatalf("unsafe broad mount in %s", joined)
+	}
+}

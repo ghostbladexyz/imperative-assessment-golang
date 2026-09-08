@@ -38,7 +38,6 @@ func TestRunnerSelectionDefaultsToDocker(t *testing.T) {
 	for input, expected := range map[string]runner.Mode{
 		"docker": runner.ModeDocker,
 		"DOCKER": runner.ModeDocker,
-		"local":  runner.ModeLocal,
 	} {
 		actual, err := parseRunnerMode(input)
 		if err != nil || actual != expected {
@@ -83,17 +82,6 @@ func TestHealthReportsSafeRunnerConfiguration(t *testing.T) {
 		}
 	}
 
-	localHandler, err := routes(&api{runner: &fakeRunner{info: runner.Info{
-		Mode: runner.ModeLocal, GoVersion: "go1.25.4", Message: "Local runner selected.",
-	}}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	localResponse := httptest.NewRecorder()
-	localHandler.ServeHTTP(localResponse, httptest.NewRequest(http.MethodGet, "/api/health", nil))
-	if strings.Contains(localResponse.Body.String(), "dockerImage") {
-		t.Fatalf("local health response should omit Docker image: %s", localResponse.Body.String())
-	}
 }
 
 func TestBrowserCannotSelectRunnerMode(t *testing.T) {
@@ -105,7 +93,7 @@ func TestBrowserCannotSelectRunnerMode(t *testing.T) {
 	request := httptest.NewRequest(
 		http.MethodPost,
 		"/api/run",
-		strings.NewReader(`{"exerciseKey":"foundation/1","code":"func NormalizeTokens(string) []string { return nil }","testIds":[],"runner":"local"}`),
+		strings.NewReader(`{"exerciseKey":"checkpoint/validate-stack","code":"package main","testIds":[],"runner":"local"}`),
 	)
 	request.Header.Set("Content-Type", "application/json")
 	response := httptest.NewRecorder()
@@ -141,11 +129,10 @@ func TestCataloguePublishesProgressIdentityManifest(t *testing.T) {
 	}
 	if body.ProgressSchemaVersion != progressSchemaVersion ||
 		body.LegacyProgress.SchemaVersion != 4 ||
-		len(body.LegacyProgress.ExerciseKeys) != 171 ||
-		len(body.Levels) != 189 ||
-		body.Levels[0].Key != "foundation/1" ||
-		body.LegacyProgress.ExerciseKeys[0] != body.Levels[0].Key ||
-		body.Levels[len(body.Levels)-1].Key != "advanced/18" {
+		len(body.LegacyProgress.ExerciseKeys) != 0 ||
+		len(body.Levels) != 17 ||
+		body.Levels[0].Key != "checkpoint/validate-stack" ||
+		body.Levels[len(body.Levels)-1].Key != "checkpoint/reactions" {
 		t.Fatalf("unexpected catalogue manifest: %#v", body)
 	}
 }
@@ -155,7 +142,7 @@ func TestReceiptValidationReturnsExerciseKeys(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	encoded, err := manager.Issue("foundation/1", "source")
+	encoded, err := manager.Issue("checkpoint/validate-stack", "source")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -166,12 +153,12 @@ func TestReceiptValidationReturnsExerciseKeys(t *testing.T) {
 	request := httptest.NewRequest(
 		http.MethodPost,
 		"/api/receipts/validate",
-		strings.NewReader(`{"receipts":{"foundation/1":"`+encoded+`"}}`),
+		strings.NewReader(`{"receipts":{"checkpoint/validate-stack":"`+encoded+`"}}`),
 	)
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
 	if response.Code != http.StatusOK ||
-		!strings.Contains(response.Body.String(), `"validExerciseKeys":["foundation/1"]`) {
+		!strings.Contains(response.Body.String(), `"validExerciseKeys":["checkpoint/validate-stack"]`) {
 		t.Fatalf("unexpected receipt validation: %d %s", response.Code, response.Body.String())
 	}
 }

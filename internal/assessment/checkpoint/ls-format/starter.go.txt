@@ -1,0 +1,47 @@
+package main
+
+import (
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+)
+
+// Meta holds one file's metadata, parsed from a line of os.Args[1]:
+//
+//	<type> <mode-octal> <nlink> <owner> <group> <size> <mtime-epoch> <name>
+type Meta struct {
+	Typ, Mode, Nlink, Owner, Group, Size, Name string
+	Epoch                                      int64
+}
+
+func permString(typ, octal string) string {
+	// TODO: implement permString.
+	return ""
+}
+func fmtTime(epoch int64) string {
+	_ = time.Unix
+	// TODO: implement fmtTime.
+	return ""
+}
+
+func parse(line string) Meta {
+	p := strings.Fields(line)
+	epoch, _ := strconv.ParseInt(p[6], 10, 64)
+	return Meta{p[0], p[1], p[2], p[3], p[4], p[5], strings.Join(p[7:], " "), epoch}
+}
+
+func main() {
+	data, _ := os.ReadFile(os.Args[1])
+	var out []string
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		m := parse(line)
+		out = append(out, fmt.Sprintf("%s %s %s %s %s %s %s",
+			permString(m.Typ, m.Mode), m.Nlink, m.Owner, m.Group, m.Size, fmtTime(m.Epoch), m.Name))
+	}
+	fmt.Fprintln(os.Stdout, strings.Join(out, "\n"))
+}

@@ -1,0 +1,160 @@
+package main
+
+import (
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+)
+
+// PROVIDED: token model and tokenizer.
+
+type Kind int
+
+const (
+	Word      Kind = iota // a normal word (Text holds it)
+	Punct                 // a punctuation run glued to the previous word (Text holds it)
+	Directive             // a "(name)" / "(name, n)" instruction (Name + Count)
+)
+
+// Token is one element of the tokenized line.
+type Token struct {
+	Kind  Kind
+	Text  string // Word / Punct literal
+	Name  string // Directive name: "up" | "low" | "cap" | "rev"
+	Count int    // how many previous words the directive targets (single form == 1)
+}
+
+const punct = ".,!?:;"
+
+func isPunct(t string) bool { return t != "" && strings.Trim(t, punct) == "" }
+
+func isDirectiveName(s string) bool {
+	switch s {
+	case "up", "low", "cap", "rev":
+		return true
+	}
+	return false
+}
+
+// tokenize turns a raw line into a clean stream of typed tokens. A counted
+// directive spans two space-split tokens ("(rev," + "3)") and is merged into one
+// Directive{Name:"rev", Count:3}; "(up)" becomes Directive{Name:"up", Count:1}.
+func tokenize(line string) []Token {
+	raw := strings.Split(line, " ")
+	var toks []Token
+	for i := 0; i < len(raw); i++ {
+		t := raw[i]
+		// counted directive: "(name," followed by "k)"
+		if strings.HasPrefix(t, "(") && strings.HasSuffix(t, ",") && i+1 < len(raw) && strings.HasSuffix(raw[i+1], ")") {
+			name := t[1 : len(t)-1]
+			if k, err := strconv.Atoi(strings.TrimSuffix(raw[i+1], ")")); err == nil && isDirectiveName(name) {
+				if k < 0 {
+					k = 0
+				}
+				toks = append(toks, Token{Kind: Directive, Name: name, Count: k})
+				i++ // also consume the "k)" token
+				continue
+			}
+		}
+		// single directive: "(name)"
+		if len(t) >= 2 && t[0] == '(' && t[len(t)-1] == ')' && isDirectiveName(t[1:len(t)-1]) {
+			toks = append(toks, Token{Kind: Directive, Name: t[1 : len(t)-1], Count: 1})
+			continue
+		}
+		if isPunct(t) {
+			toks = append(toks, Token{Kind: Punct, Text: t})
+			continue
+		}
+		toks = append(toks, Token{Kind: Word, Text: t})
+	}
+	return toks
+}
+
+// PROVIDED: helpers used by resolve.
+
+// applyCase returns w cased per name ("up"|"low"|"cap").
+func applyCase(w, name string) string {
+	switch name {
+	case "up":
+		return strings.ToUpper(w)
+	case "low":
+		return strings.ToLower(w)
+	case "cap":
+		if w == "" {
+			return w
+		}
+		return strings.ToUpper(w[:1]) + strings.ToLower(w[1:])
+	}
+	return w
+}
+
+// lastWordIdx returns the positions in out of the last n Word tokens (Punct is
+// skipped), or every word position if fewer than n exist — so a directive whose
+// count exceeds the available words targets them all and never panics.
+func lastWordIdx(out []Token, n int) []int {
+	var wi []int
+	for j, t := range out {
+		if t.Kind == Word {
+			wi = append(wi, j)
+		}
+	}
+	if n < len(wi) {
+		wi = wi[len(wi)-n:]
+	}
+	return wi
+}
+
+// PROVIDED: output assembly.
+
+// assemble joins the resolved tokens: one space between words, punctuation glued
+// to the previous word, empty words dropped.
+func assemble(out []Token) string {
+	var b strings.Builder
+	for _, t := range out {
+		if t.Kind == Word && t.Text == "" {
+			continue
+		}
+		switch {
+		case t.Kind == Punct:
+			b.WriteString(t.Text)
+		case b.Len() == 0:
+			b.WriteString(t.Text)
+		default:
+			b.WriteString(" " + t.Text)
+		}
+	}
+	return b.String()
+}
+
+// resolve applies directives to the preceding Word tokens. Complete only the
+// marked Directive case; the surrounding traversal is provided.
+func resolve(toks []Token) []Token {
+	var out []Token
+	for _, t := range toks {
+		switch t.Kind {
+		case Word, Punct:
+			out = append(out, t)
+		case Directive:
+			// TODO — apply this directive to the requested preceding words.
+		}
+	}
+	return out
+}
+
+func transformLine(line string) string {
+	return assemble(resolve(tokenize(line)))
+}
+
+func main() {
+	data, err := os.ReadFile(os.Args[1])
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	lines := strings.Split(string(data), "\n")
+	for i, ln := range lines {
+		lines[i] = transformLine(ln)
+	}
+	fmt.Fprint(os.Stdout, strings.Join(lines, "\n"))
+}

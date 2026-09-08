@@ -29,7 +29,7 @@ import (
 
 const maxRequestBytes = runner.MaxSourceBytes + 32*1024
 const defaultRunnerMode = "docker"
-const progressSchemaVersion = 5
+const progressSchemaVersion = 6
 
 type api struct {
 	runner   runner.Service
@@ -53,7 +53,7 @@ type validateRequest struct {
 func main() {
 	address := flag.String("addr", "127.0.0.1:8080", "local address to listen on")
 	openBrowser := flag.Bool("open", false, "open the assessment in the default browser")
-	runnerMode := flag.String("runner", defaultRunnerMode, "execution runner: docker or local")
+	runnerMode := flag.String("runner", defaultRunnerMode, "execution runner: docker")
 	checkUpdates := flag.Bool("check-updates", true, "check GitHub for assessment updates")
 	flag.Parse()
 
@@ -78,7 +78,7 @@ func main() {
 	var executionRunner runner.Service
 	switch mode {
 	case runner.ModeDocker:
-		log.Printf("Preparing the Docker sandbox (the first launch may build its pinned image)...")
+		log.Printf("Preparing the official grader (the first launch may download its pinned image)...")
 		startupCtx, cancelStartup := context.WithTimeout(context.Background(), 10*time.Minute)
 		executionRunner, err = runner.NewDocker(startupCtx, runner.DockerOptions{
 			MaxConcurrent: 2,
@@ -88,8 +88,6 @@ func main() {
 		if err != nil {
 			log.Fatalf("Docker sandbox is unavailable: %v", err)
 		}
-	case runner.ModeLocal:
-		executionRunner = runner.NewLocal("go", 2, receiptManager)
 	}
 	handler, err := routes(&api{
 		runner:   executionRunner,
@@ -104,7 +102,7 @@ func main() {
 		Handler:           securityHeaders(handler),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      35 * time.Second,
+		WriteTimeout:      2 * time.Minute,
 		IdleTimeout:       60 * time.Second,
 	}
 	listener, err := net.Listen("tcp", *address)
@@ -113,11 +111,7 @@ func main() {
 	}
 	url := "http://" + listener.Addr().String()
 	log.Printf("Imperative Go Practice Assessment is ready at %s", url)
-	if mode == runner.ModeDocker {
-		log.Printf("Execution mode: Docker sandbox (fresh restricted container per run).")
-	} else {
-		log.Printf("Execution mode: LOCAL RUNNER — trusted code only. Submitted code runs with your user permissions.")
-	}
+	log.Printf("Execution mode: pinned official Zone01 grader (fresh restricted container per run).")
 	if *openBrowser {
 		go func() {
 			time.Sleep(250 * time.Millisecond)
@@ -324,9 +318,7 @@ func parseRunnerMode(value string) (runner.Mode, error) {
 	switch runner.Mode(strings.ToLower(strings.TrimSpace(value))) {
 	case runner.ModeDocker:
 		return runner.ModeDocker, nil
-	case runner.ModeLocal:
-		return runner.ModeLocal, nil
 	default:
-		return "", fmt.Errorf("invalid -runner value %q; use docker or local", value)
+		return "", fmt.Errorf("invalid -runner value %q; use docker", value)
 	}
 }

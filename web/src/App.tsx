@@ -9,6 +9,7 @@ import {
 } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { go } from "@codemirror/lang-go";
+import Markdown from "react-markdown";
 import {
   ArrowLeft,
   ArrowRight,
@@ -38,12 +39,7 @@ import {
 import { buildConsoleStreams } from "./console";
 import { loadProgress, saveProgress } from "./storage";
 import { constrainDragTop, reorderTests } from "./test-order";
-import type {
-  AssessmentTrack,
-  Level,
-  RunResult,
-  SavedProgress,
-} from "./types";
+import type { Level, RunResult, SavedProgress } from "./types";
 
 type PaneSizes = {
   brief: number;
@@ -151,18 +147,7 @@ function App() {
       levels.find((item) => item.key === progress?.currentExerciseKey) ?? levels[0],
     [levels, progress?.currentExerciseKey],
   );
-  const activeTrack = level?.track ?? "core";
-  const trackLevels = useMemo(
-    () => levels.filter((item) => item.track === activeTrack),
-    [activeTrack, levels],
-  );
-  const trackCounts = useMemo(
-    () => ({
-      core: levels.filter((item) => item.track === "core").length,
-      advanced: levels.filter((item) => item.track === "advanced").length,
-    }),
-    [levels],
-  );
+  const trackLevels = levels;
   const trackIndex = useMemo(
     () => trackLevels.findIndex((item) => item.key === level?.key),
     [level?.key, trackLevels],
@@ -360,15 +345,6 @@ function App() {
     lastAutoRevisionRef.current = 0;
   };
 
-  const switchTrack = (track: AssessmentTrack) => {
-    if (!progress || track === activeTrack) return;
-    const rememberedKey = progress.trackExerciseKeys[track];
-    const selected =
-      levels.find((item) => item.key === rememberedKey && item.track === track) ??
-      levels.find((item) => item.track === track);
-    selectLevel(selected);
-  };
-
   const resetCode = () => {
     if (!level || !levelProgress) return;
     if (!window.confirm("Restore the starter code for this exercise?")) return;
@@ -531,22 +507,7 @@ function App() {
           <span>imperative</span>
           <strong>/ go</strong>
         </div>
-        <nav className="track-switch" aria-label="Assessment track">
-          <button
-            className={activeTrack === "core" ? "active" : ""}
-            aria-pressed={activeTrack === "core"}
-            onClick={() => switchTrack("core")}
-          >
-            Core <span>{trackCounts.core}</span>
-          </button>
-          <button
-            className={activeTrack === "advanced" ? "active" : ""}
-            aria-pressed={activeTrack === "advanced"}
-            onClick={() => switchTrack("advanced")}
-          >
-            Advanced <span>{trackCounts.advanced}</span>
-          </button>
-        </nav>
+        <div className="checkpoint-label">checkpoint · 17 exercises</div>
         <div className="level-stepper">
           <button
             onClick={() => selectLevel(trackLevels[trackIndex - 1])}
@@ -778,7 +739,6 @@ function ResizeHandle({
 }
 
 function ExerciseBrief({ level, passed }: { level: Level; passed: boolean }) {
-  const instructions = level.instructions;
   return (
     <aside className="brief">
       <div className="brief-heading">
@@ -788,70 +748,16 @@ function ExerciseBrief({ level, passed }: { level: Level; passed: boolean }) {
         <code>{level.signature}</code>
       </div>
 
-      <BriefSection title="Instructions">
-        <p className="objective">{instructions.objective}</p>
-        <p className="task-lead">Your solution must:</p>
-        <ul className="instruction-list">
-          <li>
-            <strong>Accept:</strong> {instructions.input}
-          </li>
-          <li>
-            <strong>Output:</strong> {instructions.output}
-          </li>
-          {instructions.constraints.map((rule) => (
-            <li key={rule}>{rule}</li>
-          ))}
-        </ul>
-        <p className="starter-note">{instructions.starterNote}</p>
-      </BriefSection>
-
-      <BriefSection title="Examples">
-        <div className="examples">
-          {instructions.examples.map((example) => (
-            <div key={`${example.input}-${example.output}`}>
-              <code>{example.input}</code>
-              <span>→</span>
-              <code>{example.output}</code>
-            </div>
-          ))}
-        </div>
-      </BriefSection>
-
-      <BriefSection title="Allowed">
-        <p className="allowed-label">Built-ins</p>
-        <code className="token-list">
-          {instructions.allowedBuiltins.join(" · ")}
-        </code>
-        <p className="allowed-label">Packages</p>
-        <code className="token-list">
-          {instructions.allowedPackages.join(" · ")}
-        </code>
-        <p className="restriction">
-          Everything not listed above is blocked for this exercise.
-        </p>
-        <p className="allowed-label">Avoid</p>
-        <ul className="pitfall-list">
-          {instructions.commonPitfalls.map((pitfall) => (
-            <li key={pitfall}>{pitfall}</li>
-          ))}
-        </ul>
-      </BriefSection>
+      <section className="subject-markdown">
+        <Markdown>{level.subject}</Markdown>
+        {(level.resources ?? []).map((resource) => (
+          <details className="exercise-resource" key={resource.name}>
+            <summary>Provided resource · {resource.name}</summary>
+            <pre><code>{resource.content}</code></pre>
+          </details>
+        ))}
+      </section>
     </aside>
-  );
-}
-
-function BriefSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="brief-section">
-      <h2>{title}</h2>
-      <div>{children}</div>
-    </section>
   );
 }
 

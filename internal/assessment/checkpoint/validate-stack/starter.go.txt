@@ -1,0 +1,23 @@
+package main
+
+import (
+	"fmt"
+	"os"
+	"strconv"
+)
+
+// Complete only valid. strconv is pre-imported for the numeric parsing step.
+func valid(args []string) bool {
+	_ = strconv.Atoi
+	// TODO: implement valid.
+	return true
+}
+
+// PROVIDED: process output and exit behavior.
+func main() {
+	if !valid(os.Args[1:]) {
+		fmt.Fprintln(os.Stderr, "Error")
+		os.Exit(1)
+	}
+	os.Exit(0)
+}

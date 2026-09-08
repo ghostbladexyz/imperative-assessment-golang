@@ -15,12 +15,12 @@ func TestIssueAndValidate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	encoded, err := manager.Issue("foundation/3", "source-hash")
+	encoded, err := manager.Issue("checkpoint/tetris", "source-hash")
 	if err != nil {
 		t.Fatal(err)
 	}
 	receipt, valid := manager.Validate(encoded)
-	if !valid || receipt.ExerciseKey != "foundation/3" || receipt.SourceHash != "source-hash" {
+	if !valid || receipt.ExerciseKey != "checkpoint/tetris" || receipt.SourceHash != "source-hash" {
 		t.Fatalf("unexpected receipt: %#v, valid=%v", receipt, valid)
 	}
 	if _, valid := manager.Validate(encoded + "tampered"); valid {

@@ -1,5 +1,7 @@
 package assessment
 
+import "strings"
+
 type ExerciseKey string
 
 type AssessmentTrack string
@@ -43,40 +45,49 @@ type VisibleTest struct {
 	Purpose  string `json:"purpose"`
 	Input    string `json:"input"`
 	Expected string `json:"expected"`
-	payload  any
+	labels   []string
+}
+
+type ExerciseResource struct {
+	Name    string `json:"name"`
+	Content string `json:"content"`
 }
 
 type Level struct {
-	Key           ExerciseKey     `json:"key"`
-	ID            int             `json:"id"`
-	Track         AssessmentTrack `json:"track"`
-	TrackPosition int             `json:"trackPosition"`
-	Title         string          `json:"title"`
-	Topic         string          `json:"topic"`
-	Difficulty    string          `json:"difficulty"`
-	Stretch       bool            `json:"stretch"`
-	Signature     string          `json:"signature"`
-	StarterCode   string          `json:"starterCode"`
-	Instructions  Instructions    `json:"instructions"`
-	Tests         []VisibleTest   `json:"tests"`
-	build         func([]VisibleTest) string
-	source        exerciseSource
-	sourceID      int
-	order         int
-	answerMode    answerMode
+	Key           ExerciseKey        `json:"key"`
+	ID            int                `json:"id"`
+	Track         AssessmentTrack    `json:"track"`
+	TrackPosition int                `json:"trackPosition"`
+	Title         string             `json:"title"`
+	Topic         string             `json:"topic"`
+	Difficulty    string             `json:"difficulty"`
+	Stretch       bool               `json:"stretch"`
+	Signature     string             `json:"signature"`
+	StarterCode   string             `json:"starterCode"`
+	Subject       string             `json:"subject"`
+	Resources     []ExerciseResource `json:"resources"`
+	Instructions  Instructions       `json:"instructions"`
+	Tests         []VisibleTest      `json:"tests"`
+	unrestricted  bool
 	definitionErr error
 }
 
-func (level Level) BuildHarness(tests []VisibleTest) string {
-	return level.build(tests)
+func PublicLevels() []Level {
+	return catalogueLevels()
 }
 
-func PublicLevels() []Level {
-	levels := catalogueLevels()
-	for index := range levels {
-		levels[index].build = nil
+// MatchesOfficialLabel reports whether an output label emitted by the pinned
+// Zone01 grader belongs to this public check. A trailing * is a prefix match.
+func (test VisibleTest) MatchesOfficialLabel(label string) bool {
+	for _, candidate := range test.labels {
+		if candidate == label {
+			return true
+		}
+		if strings.HasSuffix(candidate, "*") && strings.HasPrefix(label, strings.TrimSuffix(candidate, "*")) {
+			return true
+		}
 	}
-	return levels
+	return false
 }
 
 func SelectTests(level Level, ids []string) ([]VisibleTest, bool) {

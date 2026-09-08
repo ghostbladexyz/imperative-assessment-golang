@@ -45,9 +45,11 @@ export function buildConsoleStreams(
     const index = tests.findIndex((test) => test.id === failed.id);
     streams.push({
       label: `test #${index + 1} failed: ${failed.name}`,
-      value: failed.failure
-        ? `Error: ${failed.failure}`
-        : `Need: ${failed.expected}, Actual: ${failed.actual}`,
+		value: [
+			`Input: ${failed.input}`,
+			`Need: ${failed.expected}`,
+			`Got: ${failed.failure || failed.actual}`,
+		].join("\n"),
       error: true,
     });
   } else if (result.results.length > 0) {

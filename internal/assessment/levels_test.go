@@ -1,322 +1,108 @@
 package assessment
 
 import (
-	"encoding/json"
+	"crypto/sha1"
+	"fmt"
 	"strings"
 	"testing"
 )
 
-func TestDefinitionsAreComplete(t *testing.T) {
-	t.Parallel()
+func TestCheckpointCatalogueIsCompleteAndRanked(t *testing.T) {
+	want := []string{"validate-stack", "safe-sum", "tetris", "method-routing", "status-matrix", "wordcount", "ls-format", "ascii-render", "reloaded-rev", "reloaded-format", "lemin-path", "lemin-why", "bounded-fanout", "consume-join", "push-swap", "broadcast", "reactions"}
 	if err := Validate(); err != nil {
 		t.Fatal(err)
 	}
-	for _, level := range Levels() {
-		if level.Key == "" || level.Title == "" || level.Signature == "" || level.StarterCode == "" {
-			t.Fatalf("exercise %q is missing core metadata", level.Key)
+	levels := Levels()
+	if len(levels) != len(want) {
+		t.Fatalf("got %d exercises, want %d", len(levels), len(want))
+	}
+	for index, slug := range want {
+		level := levels[index]
+		if level.Key != ExerciseKey("checkpoint/"+slug) || level.Title != slug || level.ID != index+1 || level.TrackPosition != index+1 || level.Track != TrackCore {
+			t.Errorf("rank %d = %#v, want %q", index+1, level, slug)
 		}
-		if !strings.HasPrefix(level.StarterCode, "package main\n") {
-			t.Fatalf("exercise %q starter code must include an editable package declaration", level.Key)
+		if !strings.Contains(level.StarterCode, "package main") || !strings.HasPrefix(level.Subject, "# "+slug) || len(level.Tests) == 0 {
+			t.Errorf("exercise %q is missing exact source material or its grader", slug)
 		}
-		if len(level.Instructions.Hints) < 3 {
-			t.Fatalf("exercise %q has fewer than three hints", level.Key)
+	}
+	if len(LegacyExerciseKeys()) != 0 {
+		t.Fatal("old exercise identities remain in the catalogue")
+	}
+}
+
+func TestCheckpointAssetsMatchPinnedUpstreamBlobs(t *testing.T) {
+	if checkpointUpstreamCommit != "9ef45ee4a164b6d9b8ff3c5ad9b97753c3d63297" {
+		t.Fatal("unexpected upstream commit")
+	}
+	want := map[string]string{
+		"ascii-render/README.md": "907f0937714e053ef1fddd21cb2c348ca8b7d13c", "ascii-render/starter.go.txt": "1b332c788eccc234b3583dd71b681c20c4276d0a", "ascii-render/resources/banner.txt": "77f3ea44e1ef356a71ad2891e68c365923945245",
+		"bounded-fanout/README.md": "57785d7b24820b6911f1a94ee6f7d06cc0fe274e", "bounded-fanout/starter.go.txt": "593ddd303c8efc27837442598ef412f2a5b9d972",
+		"broadcast/README.md": "4998940de470adf833fbca829f77585c5aa2fc50", "broadcast/starter.go.txt": "56274f691cf0fa3a2b4346159934b94e3d8d53d0",
+		"consume-join/README.md": "937056c3443198323864800ae6ed96fcf36e25c4", "consume-join/starter.go.txt": "497d616ab3b1e0be7c3c5b30e4aa7bbf2baf29f6",
+		"lemin-path/README.md": "e9fd3bf93679fb2682d20ce39c6d1a9f556e6ae6", "lemin-path/starter.go.txt": "4903c7fd8b75627c4aa3bcdd2ad12501f735dabb",
+		"lemin-why/README.md": "dd3174e669984a43aa66b9c006a90f0e632a67af", "lemin-why/starter.go.txt": "271148be649177c6a1feaf7db836608e9c93c466",
+		"ls-format/README.md": "25cdcc75ab3b8de518f6d747e8b72ada71baecc3", "ls-format/starter.go.txt": "6ecca243e989b4996d5e127c7c164565daa1cb9e",
+		"method-routing/README.md": "8746d517d1b3fcf7ec0842f22208ebd83fdceb77", "method-routing/starter.go.txt": "8e1b28eac3c72acd6d56707236b524c280fb23c0",
+		"push-swap/README.md": "1f229568b790ee5ed6a8a694c60ed9454c4f78cf", "push-swap/starter.go.txt": "fc45d99340f4784b06a1ed3f84462f5b850f8922",
+		"reactions/README.md": "0dce41ddfec9578103d9c3656e995b0583f86df0", "reactions/starter.go.txt": "da4b6533868eb8923ebc27eb3c36b3875c46a394", "reactions/resources/schema.sql": "f9df1378ab73f8f23fe9ac8f9cc5e436db01cebc",
+		"reloaded-format/README.md": "4935cca1c266bc77c73681ffd2b4e6d713beda62", "reloaded-format/starter.go.txt": "1914e7f5a8bd1e85e687a36993a51d5294e8c1ad",
+		"reloaded-rev/README.md": "a2eb0266c6237025ea4aeb3cdbec3bbd8e77fc5b", "reloaded-rev/starter.go.txt": "248b83c9508485c92cc9174cf8f34f5733d05e1b",
+		"safe-sum/README.md": "6b2100ea1bc5733331630ee5233b825d572e0ab9", "safe-sum/starter.go.txt": "2021fb94ddf685d6cda397e433325646fc65dec7",
+		"status-matrix/README.md": "f5ef976b136c258c430dec1a7ea7287c32ec863a", "status-matrix/starter.go.txt": "1fb7eedf55a6afc1c6ec4b358a4075c11fd6f1f4",
+		"tetris/README.md": "515606a1e5f6f8689630c4e3f27ab3cd26b8d8e6", "tetris/starter.go.txt": "1aa40983ed6e6eeae54b77faa394c7b53ee55f9d",
+		"validate-stack/README.md": "3c21e0454493f1ba6334571c51cfb69e65baf262", "validate-stack/starter.go.txt": "03c1e6368b736e6194c234d7ca932a030d85d966",
+		"wordcount/README.md": "b705d070632b4a36061cb3fcdcf2dc6a534975ae", "wordcount/starter.go.txt": "1fb9ace3142d2d7b98ff32bd1d4c6fb1029733e8",
+	}
+	for path, blobID := range want {
+		content, err := checkpointAssets.ReadFile("checkpoint/" + path)
+		if err != nil {
+			t.Fatal(err)
 		}
-		if len(level.Instructions.Examples) == 0 || len(level.Instructions.Examples) > maxPracticeExamples {
-			t.Fatalf("exercise %q has %d examples, want between 1 and %d", level.Key, len(level.Instructions.Examples), maxPracticeExamples)
-		}
-		exerciseCallPrefix := functionName(level.Signature) + "("
-		seenExamples := make(map[Example]struct{}, len(level.Instructions.Examples))
-		for _, example := range level.Instructions.Examples {
-			if !strings.HasPrefix(example.Input, exerciseCallPrefix) {
-				t.Fatalf("exercise %q includes an example from another function: %#v", level.Key, example)
-			}
-			if _, exists := seenExamples[example]; exists {
-				t.Fatalf("exercise %q repeats example %#v", level.Key, example)
-			}
-			seenExamples[example] = struct{}{}
-		}
-		if (len(level.Instructions.AllowedBuiltins) == 0 && level.answerMode != printedAnswer) ||
-			len(level.Instructions.AllowedPackages) == 0 {
-			t.Fatalf("exercise %q has no explicit source policy", level.Key)
-		}
-		if harness := level.BuildHarness(level.Tests[:1]); harness == "" {
-			t.Fatalf("exercise %q generated an empty harness", level.Key)
+		content = []byte(strings.ReplaceAll(string(content), "\r\n", "\n"))
+		header := fmt.Sprintf("blob %d\x00", len(content))
+		actual := fmt.Sprintf("%x", sha1.Sum(append([]byte(header), content...)))
+		if actual != blobID {
+			t.Errorf("%s blob = %s, want %s", path, actual, blobID)
 		}
 	}
 }
 
-// TestEveryExerciseHasCleanTestCoverage audits duplicate and synthetic rows across the complete catalogue.
-func TestEveryExerciseHasCleanTestCoverage(t *testing.T) {
-	t.Parallel()
-	for _, level := range Levels() {
-		seenNames := make(map[string]struct{}, len(level.Tests))
-		seenRows := make(map[string]struct{}, len(level.Tests))
+func TestPublicLevelsPublishOfficialChecks(t *testing.T) {
+	for _, level := range PublicLevels() {
+		if level.Instructions.AllowedBuiltins == nil || level.Instructions.AllowedPackages == nil {
+			t.Fatalf("%q serializes a null allowlist", level.Key)
+		}
+		if level.Resources == nil {
+			t.Fatalf("%q serializes a null resource list", level.Key)
+		}
 		for _, current := range level.Tests {
-			if strings.Contains(current.Name, "stability pass") ||
-				strings.Contains(current.Purpose, "stability pass") ||
-				strings.Contains(current.Input, "stability pass") {
-				t.Errorf("exercise %q contains a synthetic stability row %#v", level.Key, current)
+			if strings.TrimSpace(current.Input) == "" || strings.TrimSpace(current.Expected) == "" || current.Expected == "pass" {
+				t.Errorf("%q test %q has placeholder input/need", level.Key, current.ID)
 			}
-			if _, exists := seenNames[current.Name]; exists {
-				t.Errorf("exercise %q repeats test name %q", level.Key, current.Name)
-			}
-			seenNames[current.Name] = struct{}{}
-			row := current.Input + "\x00" + current.Expected
-			if _, exists := seenRows[row]; exists {
-				t.Errorf("exercise %q repeats test input and expectation %q", level.Key, current.Input)
-			}
-			seenRows[row] = struct{}{}
 		}
 	}
 }
 
-func TestPublicLevelsDoNotExposeHarnesses(t *testing.T) {
-	t.Parallel()
-	for _, level := range PublicLevels() {
-		if level.build != nil {
-			t.Fatalf("level %d exposed its harness builder", level.ID)
-		}
-	}
-}
-
-func TestPublicLevelsSerializeFrontendAllowlistsAsArrays(t *testing.T) {
-	t.Parallel()
-	for _, level := range PublicLevels() {
-		if level.Instructions.AllowedBuiltins == nil {
-			t.Errorf("exercise %q serializes allowedBuiltins as null", level.Key)
-		}
-		if level.Instructions.AllowedPackages == nil {
-			t.Errorf("exercise %q serializes allowedPackages as null", level.Key)
-		}
-	}
-}
-
-func TestSelectTestsPreservesRequestedExecutionOrder(t *testing.T) {
-	t.Parallel()
+func TestSelectTestsPreservesRequestedOrder(t *testing.T) {
 	level := Levels()[0]
 	first, second, third := level.Tests[0], level.Tests[1], level.Tests[2]
-
 	selected, valid := SelectTests(level, []string{third.ID, first.ID, second.ID})
-
 	if !valid {
-		t.Fatal("expected known test identifiers to be accepted")
+		t.Fatal("known test identifiers were rejected")
 	}
 	for index, want := range []string{third.ID, first.ID, second.ID} {
 		if selected[index].ID != want {
-			t.Fatalf("selected test %d = %q, want %q", index, selected[index].ID, want)
+			t.Fatalf("test %d = %q, want %q", index, selected[index].ID, want)
 		}
-	}
-}
-
-func TestZone01CatalogueRemainsComplete(t *testing.T) {
-	t.Parallel()
-	for sourceID := 22; sourceID <= 65; sourceID++ {
-		key := exerciseKey(sourceZone01, sourceID)
-		if _, found := FindExercise(key); !found {
-			t.Errorf("missing Zone01 exercise %q", key)
-		}
-	}
-}
-
-func TestProgressionStartsSimpleAndContainsFullCatalogue(t *testing.T) {
-	t.Parallel()
-	levels := Levels()
-	if len(levels) != exerciseCount {
-		t.Fatalf("got %d exercises, want %d", len(levels), exerciseCount)
-	}
-	wantSignatures := []string{
-		"Echo(value string) string",
-		"Increment(value int) int",
-		"IsPositive(value int) bool",
-	}
-	for index, want := range wantSignatures {
-		if levels[index].Signature != want {
-			t.Errorf("exercise %d signature = %q, want %q", index+1, levels[index].Signature, want)
-		}
-		if levels[index].Difficulty != "Beginner" {
-			t.Errorf("exercise %d difficulty = %q, want Beginner", index+1, levels[index].Difficulty)
-		}
-	}
-	if levels[21].Title != "Only Z" {
-		t.Fatalf("exercise 22 = %q, want Only Z", levels[21].Title)
-	}
-}
-
-func TestImportedExercisesIncreaseInDifficulty(t *testing.T) {
-	t.Parallel()
-	levels := Levels()
-	previous := 0
-	for _, level := range levels[21:] {
-		current := level.order
-		if current < previous {
-			t.Fatalf("%q (%s) appears after a harder exercise", level.Title, level.Difficulty)
-		}
-		previous = current
-	}
-}
-
-func TestCatalogueLookupUsesStableKeysAndFrozenLegacyPositions(t *testing.T) {
-	t.Parallel()
-	levels := Levels()
-	legacy := LegacyExerciseKeys()
-	if len(legacy) != legacyExerciseCount {
-		t.Fatalf("got %d legacy keys, want frozen count %d", len(legacy), legacyExerciseCount)
-	}
-	for index, level := range levels {
-		byKey, found := FindExercise(level.Key)
-		if !found || byKey.ID != level.ID {
-			t.Fatalf("key lookup for %q returned %#v", level.Key, byKey)
-		}
-		byPosition, found := FindLevel(index + 1)
-		if !found || byPosition.Key != level.Key {
-			t.Fatalf("position lookup %d returned %#v", index+1, byPosition)
-		}
-	}
-	for position, want := range map[int]ExerciseKey{
-		1: "foundation/1", 22: "piscine/1001", 40: "zone01/22",
-		171: "zone01/65",
-	} {
-		key, found := LegacyExerciseKey(position)
-		if !found || key != want {
-			t.Fatalf("legacy position %d maps to %q, want %q", position, key, want)
-		}
-	}
-	if _, found := LegacyExerciseKey(legacyExerciseCount + 1); found {
-		t.Fatal("advanced exercises must not extend the frozen schema-v4 position map")
-	}
-}
-
-// TestAdvancedCatalogueContainsEighteenCapstones keeps the independent track contiguous and visibly classified in the UI.
-func TestAdvancedCatalogueContainsEighteenCapstones(t *testing.T) {
-	t.Parallel()
-	for sourceID := 1; sourceID <= 18; sourceID++ {
-		level, found := FindExercise(exerciseKey(sourceAdvanced, sourceID))
-		if !found {
-			t.Fatalf("missing advanced exercise %d", sourceID)
-		}
-		if level.Difficulty != "Advanced" || !level.Stretch {
-			t.Errorf("advanced exercise %q has difficulty=%q stretch=%t", level.Key, level.Difficulty, level.Stretch)
-		}
-		if level.Track != TrackAdvanced || level.TrackPosition != sourceID {
-			t.Errorf("advanced exercise %q has track=%q position=%d", level.Key, level.Track, level.TrackPosition)
-		}
-	}
-}
-
-// TestCoreTrackPreservesOriginalPositions proves the new track cannot disturb existing learner navigation.
-func TestCoreTrackPreservesOriginalPositions(t *testing.T) {
-	t.Parallel()
-	for position, level := range Levels()[:legacyExerciseCount] {
-		if level.Track != TrackCore || level.TrackPosition != position+1 {
-			t.Fatalf("core exercise %q has track=%q position=%d", level.Key, level.Track, level.TrackPosition)
-		}
-	}
-}
-
-// TestAdvancedSubjectsHaveThreeExercises locks the requested curriculum breadth into the catalogue.
-func TestAdvancedSubjectsHaveThreeExercises(t *testing.T) {
-	t.Parallel()
-	subjectIDs := map[string][]int{
-		"Parsing":     {1, 2, 3},
-		"Error":       {8, 10, 11},
-		"HTTP":        {5, 12, 13},
-		"Algorithms":  {4, 9, 14},
-		"Concurrency": {6, 15, 16},
-		"SQL":         {7, 17, 18},
-	}
-	for subject, sourceIDs := range subjectIDs {
-		if len(sourceIDs) < 3 {
-			t.Fatalf("subject %q has only %d exercises", subject, len(sourceIDs))
-		}
-		for _, sourceID := range sourceIDs {
-			level, found := FindExercise(exerciseKey(sourceAdvanced, sourceID))
-			if !found || !strings.Contains(level.Topic, subject) {
-				t.Errorf("advanced/%d does not represent %s: %q", sourceID, subject, level.Topic)
-			}
-		}
-	}
-}
-
-func TestKinoz01CatalogueAddsOneHundredAndSixUniqueExercises(t *testing.T) {
-	t.Parallel()
-	if got := len(piscineLevels()); got != 106 {
-		t.Fatalf("got %d kinoz01 exercises, want 106", got)
-	}
-}
-
-func TestSourceAuditPreservesPrintedOutputExercises(t *testing.T) {
-	t.Parallel()
-	wanted := map[ExerciseKey]bool{
-		"piscine/1001": true, "piscine/1002": true, "piscine/1003": true,
-		"piscine/1004": true, "piscine/1005": true, "piscine/1008": true,
-		"piscine/1009": true, "piscine/1010": true, "piscine/1011": true,
-		"piscine/1012": true, "piscine/1013": true, "piscine/1014": true,
-		"piscine/1015": true, "piscine/1016": true, "piscine/1017": true,
-		"piscine/1018": true, "piscine/1050": true, "piscine/1051": true,
-		"piscine/1060": true, "piscine/1061": true, "piscine/1062": true,
-		"piscine/1063": true, "piscine/1064": true, "piscine/1072": true,
-		"piscine/1079": true, "piscine/1086": true,
-		"zone01/22": true, "zone01/34": true, "zone01/48": true,
-		"zone01/49": true, "zone01/53": true,
-	}
-
-	for _, level := range Levels() {
-		_, shouldPrint := wanted[level.Key]
-		if (level.answerMode == printedAnswer) != shouldPrint {
-			t.Errorf("exercise %q printed mode = %t, want %t", level.Key, level.answerMode == printedAnswer, shouldPrint)
-			continue
-		}
-		if !shouldPrint {
-			continue
-		}
-		delete(wanted, level.Key)
-		if len(level.Instructions.AllowedPackages) != 1 ||
-			level.Instructions.AllowedPackages[0] != z01Package {
-			t.Errorf("exercise %q packages = %v, want only %q", level.Key, level.Instructions.AllowedPackages, z01Package)
-		}
-		for _, builtin := range level.Instructions.AllowedBuiltins {
-			if builtin == "print" || builtin == "println" {
-				t.Errorf("exercise %q allows %q instead of requiring z01.PrintRune", level.Key, builtin)
-			}
-		}
-		if !strings.Contains(level.StarterCode, `"github.com/01-edu/z01"`) ||
-			!strings.Contains(level.StarterCode, "z01.PrintRune") {
-			t.Errorf("exercise %q starter does not provide z01.PrintRune", level.Key)
-		}
-		closingParenthesis := strings.LastIndex(level.Signature, ")")
-		if closingParenthesis < 0 ||
-			strings.TrimSpace(level.Signature[closingParenthesis+1:]) != "" {
-			t.Errorf("exercise %q signature still declares a return value: %q", level.Key, level.Signature)
-		}
-		for _, line := range strings.Split(level.StarterCode, "\n") {
-			statement := strings.TrimSpace(line)
-			if statement == "return" || strings.HasPrefix(statement, "return ") {
-				t.Errorf("exercise %q starter still contains %q", level.Key, statement)
-			}
-		}
-		for _, current := range level.Tests {
-			var printed string
-			if err := json.Unmarshal([]byte(current.Expected), &printed); err != nil {
-				t.Errorf("exercise %q test %q expected value is not printed text: %q", level.Key, current.Name, current.Expected)
-			}
-		}
-	}
-	if len(wanted) != 0 {
-		t.Fatalf("source-audited exercises are missing: %v", wanted)
 	}
 }
 
 func TestCatalogueReturnsDefensiveProjections(t *testing.T) {
-	t.Parallel()
 	first := Levels()
 	first[0].Title = "changed"
 	first[0].Tests[0].Name = "changed"
-	first[0].Instructions.Hints[0] = "changed"
-
 	second := Levels()
-	if second[0].Title == "changed" ||
-		second[0].Tests[0].Name == "changed" ||
-		second[0].Instructions.Hints[0] == "changed" {
-		t.Fatal("caller mutation changed the cached catalogue")
+	if second[0].Title == "changed" || second[0].Tests[0].Name == "changed" {
+		t.Fatal("caller mutation changed cached catalogue")
 	}
 }

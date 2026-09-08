@@ -1,0 +1,96 @@
+package main
+
+import (
+	"fmt"
+	"os"
+	"strings"
+)
+
+type Cell struct{ R, C int }
+type Piece []Cell // cells normalised so the bounding box top-left is (0,0)
+
+func parsePieces(path string) []Piece {
+	data, _ := os.ReadFile(path)
+	var pieces []Piece
+	for _, blk := range strings.Split(strings.TrimRight(string(data), "\n"), "\n\n") {
+		var cells []Cell
+		minR, minC := 1<<30, 1<<30
+		for r, row := range strings.Split(blk, "\n") {
+			for c, ch := range row {
+				if ch == '#' {
+					cells = append(cells, Cell{r, c})
+					if r < minR {
+						minR = r
+					}
+					if c < minC {
+						minC = c
+					}
+				}
+			}
+		}
+		for i := range cells { // normalise to (0,0)
+			cells[i].R -= minR
+			cells[i].C -= minC
+		}
+		pieces = append(pieces, cells)
+	}
+	return pieces
+}
+
+func canPlace(grid [][]byte, p Piece, row, col int) bool {
+	// TODO: implement canPlace.
+	return false
+}
+
+func stamp(grid [][]byte, p Piece, row, col int, ch byte) {
+	// TODO: implement stamp.
+}
+
+// backtrack and solve are provided.
+func backtrack(grid [][]byte, pieces []Piece, i int) bool {
+	if i == len(pieces) {
+		return true
+	}
+	n := len(grid)
+	letter := byte('A' + i)
+	for r := 0; r < n; r++ {
+		for c := 0; c < n; c++ {
+			if canPlace(grid, pieces[i], r, c) {
+				stamp(grid, pieces[i], r, c, letter)
+				if backtrack(grid, pieces, i+1) {
+					return true
+				}
+				stamp(grid, pieces[i], r, c, '.')
+			}
+		}
+	}
+	return false
+}
+
+func solve(pieces []Piece) [][]byte {
+	side := 1
+	for side*side < 4*len(pieces) { // smallest square that could possibly fit
+		side++
+	}
+	maxSide := 4*len(pieces) + 4
+	for ; side <= maxSide; side++ {
+		grid := make([][]byte, side)
+		for i := range grid {
+			grid[i] = []byte(strings.Repeat(".", side))
+		}
+		if backtrack(grid, pieces, 0) {
+			return grid
+		}
+	}
+	return nil
+}
+
+func main() {
+	if len(os.Args) != 2 {
+		fmt.Fprintln(os.Stderr, "ERROR")
+		os.Exit(1)
+	}
+	for _, row := range solve(parsePieces(os.Args[1])) {
+		fmt.Println(string(row))
+	}
+}

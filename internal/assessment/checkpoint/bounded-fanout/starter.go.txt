@@ -1,0 +1,47 @@
+// PROVIDED: file input and output driver. Complete only squareAll.
+package main
+
+import (
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+	"sync"
+)
+
+const workers = 4
+
+func squareAll(nums []int) []int {
+	out := make([]int, len(nums))
+	jobs := make(chan int) // jobs feeds the workers
+	var wg sync.WaitGroup
+
+	// TODO: implement squareAll.
+
+	_ = jobs
+	_ = &wg
+	return out
+}
+
+func main() {
+	data, err := os.ReadFile(os.Args[1])
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	var nums []int
+	for _, f := range strings.Fields(string(data)) {
+		n, err := strconv.Atoi(f)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "bad int:", f)
+			os.Exit(1)
+		}
+		nums = append(nums, n)
+	}
+	out := squareAll(nums)
+	parts := make([]string, len(out))
+	for i, v := range out {
+		parts[i] = strconv.Itoa(v)
+	}
+	fmt.Print(strings.Join(parts, "\n"))
+}

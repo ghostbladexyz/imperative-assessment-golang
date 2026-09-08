@@ -1,0 +1,114 @@
+package main
+
+import (
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+)
+
+// Colony is the parsed ant farm: the two endpoints, the adjacency map, and the
+// number of ants to move.
+type Colony struct {
+	Start, End string
+	Adj        map[string][]string
+	Ants       int
+}
+
+func parseColony(path string) (*Colony, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	c := &Colony{Adj: map[string][]string{}}
+	pending := ""
+	for _, raw := range strings.Split(string(data), "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" {
+			continue
+		}
+		switch line {
+		case "##start":
+			pending = "start"
+			continue
+		case "##end":
+			pending = "end"
+			continue
+		}
+		if strings.HasPrefix(line, "#") { // a comment
+			continue
+		}
+		if c.Ants == 0 && !strings.Contains(line, "-") && !strings.Contains(line, " ") {
+			if n, err := strconv.Atoi(line); err == nil { // the ant-count line
+				c.Ants = n
+				continue
+			}
+		}
+		if strings.Contains(line, "-") && !strings.Contains(line, " ") { // a tunnel a-b
+			p := strings.SplitN(line, "-", 2)
+			c.Adj[p[0]] = append(c.Adj[p[0]], p[1])
+			c.Adj[p[1]] = append(c.Adj[p[1]], p[0])
+			continue
+		}
+		if f := strings.Fields(line); len(f) == 3 { // a room "name x y"
+			if _, ok := c.Adj[f[0]]; !ok {
+				c.Adj[f[0]] = nil
+			}
+			switch pending {
+			case "start":
+				c.Start = f[0]
+			case "end":
+				c.End = f[0]
+			}
+			pending = ""
+		}
+	}
+	return c, nil
+}
+
+// derivePaths walks each disjoint route out of Start to End and returns those
+// routes as their edge counts. (Provided: this colony's routes are simple
+// vertex-disjoint chains, so following each interior room's far neighbour to
+// End counts the edges of every route.)
+func derivePaths(c *Colony) []int {
+	var paths []int
+	for _, first := range c.Adj[c.Start] {
+		prev, cur, edges := c.Start, first, 1
+		for cur != c.End {
+			next := ""
+			for _, nb := range c.Adj[cur] {
+				if nb != prev {
+					next = nb
+					break
+				}
+			}
+			if next == "" {
+				break
+			}
+			prev, cur = cur, next
+			edges++
+		}
+		if cur == c.End {
+			paths = append(paths, edges)
+		}
+	}
+	return paths
+}
+
+func minTurns(paths []int, ants int) int {
+	// TODO: implement minTurns.
+	return 0
+}
+
+func main() {
+	if len(os.Args) != 2 {
+		fmt.Fprintln(os.Stderr, "usage: ./farm <colony-file>")
+		os.Exit(1)
+	}
+	c, err := parseColony(os.Args[1])
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "ERROR")
+		os.Exit(1)
+	}
+	fmt.Println(minTurns(derivePaths(c), c.Ants))
+}
