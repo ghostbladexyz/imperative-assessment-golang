@@ -35,9 +35,10 @@ short timeout, is cached for one hour, and never prevents startup. Disable it
 with `-check-updates=false`.
 
 Each submission receives a disposable container with no network, a read-only
-root filesystem, resource limits, and a read-only bind mount of only the
-submitted `main.go`. The official entrypoint drops privileges before executing
-learner code. This remains intended for local and classroom use; do not expose
+root filesystem, resource limits, and read-only bind mounts for the submitted
+`main.go` and any exercise-supplied resources. The official entrypoint drops
+privileges before executing learner code. This remains intended for local and
+classroom use; do not expose
 the server as a public code-execution service. See [SECURITY.md](SECURITY.md).
 
 ## Using the assessment

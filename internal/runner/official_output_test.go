@@ -64,7 +64,7 @@ func TestFailedAggregateCannotIssueReceipt(t *testing.T) {
 }
 
 func TestDockerRunUsesOnlyExactSourceMountAndPinnedImage(t *testing.T) {
-	args := dockerRunArgs("imperative-go-assessment-0123456789abcdef01234567", "checkpoint/validate-stack", `C:\\tmp\\main.go`)
+	args := dockerRunArgs("imperative-go-assessment-0123456789abcdef01234567", "checkpoint/validate-stack", `C:\\tmp\\main.go`, nil)
 	joined := strings.Join(args, " ")
 	for _, required := range []string{dockerImage, "--network none", "--read-only", "EMIT_JSON=1", "target=/jail/student/validate-stack/main.go,readonly"} {
 		if !strings.Contains(joined, required) {
@@ -73,5 +73,34 @@ func TestDockerRunUsesOnlyExactSourceMountAndPinnedImage(t *testing.T) {
 	}
 	if strings.Contains(joined, "docker.sock") || strings.Contains(joined, "target=/workspace") {
 		t.Fatalf("unsafe broad mount in %s", joined)
+	}
+}
+
+func TestDockerRunMountsDeclaredResourcesReadOnly(t *testing.T) {
+	args := dockerRunArgs(
+		"imperative-go-assessment-0123456789abcdef01234567",
+		"checkpoint/ascii-render",
+		"C:\\tmp\\main.go",
+		[]dockerResourceMount{
+			{sourcePath: "C:\\tmp\\banner.txt", targetPath: "/jail/student/ascii-render/banner.txt"},
+		},
+	)
+	var mounts []string
+	for index := 0; index < len(args); index++ {
+		if args[index] == "--mount" {
+			mounts = append(mounts, args[index+1])
+		}
+	}
+	want := []string{
+		"type=bind,source=C:\\tmp\\main.go,target=/jail/student/ascii-render/main.go,readonly",
+		"type=bind,source=C:\\tmp\\banner.txt,target=/jail/student/ascii-render/banner.txt,readonly",
+	}
+	if len(mounts) != len(want) {
+		t.Fatalf("got %d mounts, want %d: %#v", len(mounts), len(want), mounts)
+	}
+	for index := range want {
+		if mounts[index] != want[index] {
+			t.Fatalf("mount %d = %q, want %q", index, mounts[index], want[index])
+		}
 	}
 }

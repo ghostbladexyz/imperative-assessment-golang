@@ -64,6 +64,11 @@ type dockerAdapter struct {
 	random       io.Reader
 }
 
+type dockerResourceMount struct {
+	sourcePath string
+	targetPath string
+}
+
 func NewDocker(ctx context.Context, options DockerOptions) (*Engine, error) {
 	if options.DockerBinary == "" {
 		options.DockerBinary = "docker"
@@ -128,10 +133,14 @@ func (docker *dockerAdapter) Execute(ctx context.Context, plan executionPlan) ex
 	if err := os.WriteFile(sourcePath, []byte(plan.prepared), 0o600); err != nil {
 		return executionOutcome{status: executionInternal, runtimeError: "The grader could not prepare the submitted source."}
 	}
+	resourceMounts, err := stageOfficialResources(directory, string(plan.level.Key), plan.level.Resources)
+	if err != nil {
+		return executionOutcome{status: executionInternal, runtimeError: "The grader could not prepare the exercise resources."}
+	}
 
 	runCtx, cancel := context.WithTimeout(ctx, dockerHostTimeout)
 	command := docker.commands.Run(runCtx, dockerRunOutputLimit, nil, docker.dockerBinary,
-		dockerRunArgs(name, string(plan.level.Key), sourcePath)...)
+		dockerRunArgs(name, string(plan.level.Key), sourcePath, resourceMounts)...)
 	cancel()
 	cleanupErr := docker.cleanup(name)
 	if cleanupErr != nil {
@@ -327,18 +336,42 @@ func upsertWire(items []wireResult, wire wireResult) []wireResult {
 	return append(items, wire)
 }
 
-func dockerRunArgs(name, exerciseKey, sourcePath string) []string {
+func stageOfficialResources(directory, exerciseKey string, resources []assessment.ExerciseResource) ([]dockerResourceMount, error) {
+	slug := strings.TrimPrefix(exerciseKey, "checkpoint/")
+	targetDirectory := "/jail/student/" + slug
+	mounts := make([]dockerResourceMount, 0, len(resources))
+	for _, resource := range resources {
+		if resource.Name == "" || resource.Name == "." || resource.Name == ".." || strings.ContainsAny(resource.Name, "/\\") {
+			return nil, fmt.Errorf("invalid official resource name %q", resource.Name)
+		}
+		sourcePath := filepath.Join(directory, resource.Name)
+		if err := os.WriteFile(sourcePath, []byte(resource.Content), 0o600); err != nil {
+			return nil, err
+		}
+		mounts = append(mounts, dockerResourceMount{
+			sourcePath: sourcePath,
+			targetPath: targetDirectory + "/" + resource.Name,
+		})
+	}
+	return mounts, nil
+}
+
+func dockerRunArgs(name, exerciseKey, sourcePath string, resourceMounts []dockerResourceMount) []string {
 	slug := strings.TrimPrefix(exerciseKey, "checkpoint/")
 	target := "/jail/student/" + slug + "/main.go"
-	return []string{
+	args := []string{
 		"run", "--name", name, "--label", dockerContainerLabel, "--rm", "--pull", "never",
 		"--platform", dockerPlatform, "--network", "none", "--ipc", "none", "--read-only", "--log-driver", "none", "--hostname", "grader",
 		"--memory", "512m", "--memory-swap", "512m", "--cpus", "1", "--pids-limit", "256",
 		"--ulimit", "nofile=256:256", "--ulimit", "core=0:0",
 		"--tmpfs", "/tmp:rw,exec,nosuid,nodev,size=256m,mode=1777",
 		"--env", "EXERCISE=" + slug, "--env", "FILE=" + slug + "/main.go", "--env", "EMIT_JSON=1",
-		"--mount", "type=bind,source=" + sourcePath + ",target=" + target + ",readonly", dockerImage,
 	}
+	args = append(args, "--mount", "type=bind,source="+sourcePath+",target="+target+",readonly")
+	for _, resource := range resourceMounts {
+		args = append(args, "--mount", "type=bind,source="+resource.sourcePath+",target="+resource.targetPath+",readonly")
+	}
+	return append(args, dockerImage)
 }
 
 func cleanupStaleContainers(ctx context.Context, commands CommandExecutor, dockerBinary string) error {
