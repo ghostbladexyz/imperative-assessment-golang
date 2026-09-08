@@ -22,7 +22,7 @@ Do not include real credentials, private keys, or unrelated personal data in a r
 
 The server binds to `127.0.0.1` by default and selects the runner at startup. Browser requests cannot change that selection.
 
-Each submission receives a new container with no network or shared IPC, a read-only root filesystem, resource limits, a bounded tmpfs, and no Docker log persistence. Only the temporary submitted `main.go` is bind-mounted, read-only. The pinned official entrypoint compiles it and then uses `setpriv` to execute learner code as UID/GID 65534 with cleared supplementary groups and `no-new-privileges`. The container is force-removed after every outcome, and startup removes labeled non-running containers left by an abrupt host-process exit.
+Each submission receives a new container with no network or shared IPC, a read-only root filesystem, resource limits, a bounded tmpfs, and no Docker log persistence. The temporary submitted `main.go` and declared exercise resources are bind-mounted read-only. The pinned official entrypoint compiles them and then uses `setpriv` to execute learner code as UID/GID 65534 with cleared supplementary groups and `no-new-privileges`. The container is force-removed after every outcome, and startup removes labeled non-running containers left by an abrupt host-process exit.
 
 The outer container starts as root because the official entrypoint needs to compile and then perform that privilege transition. Applying Docker's blanket capability drop or outer `no-new-privileges` prevents the pinned grader from switching users. This is a deliberate compatibility trade-off, not a claim of hardened multi-tenant isolation.
 

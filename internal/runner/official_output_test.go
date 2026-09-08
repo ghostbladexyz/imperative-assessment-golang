@@ -82,7 +82,7 @@ func TestDockerRunMountsDeclaredResourcesReadOnly(t *testing.T) {
 		"checkpoint/ascii-render",
 		"C:\\tmp\\main.go",
 		[]dockerResourceMount{
-			{sourcePath: "C:\\tmp\\banner.txt", targetPath: "/jail/student/ascii-render/banner.txt"},
+			{sourcePath: "C:\\tmp\\banner.txt", targetPath: "/jail/student/ascii-render/resources/banner.txt"},
 		},
 	)
 	var mounts []string
@@ -93,7 +93,7 @@ func TestDockerRunMountsDeclaredResourcesReadOnly(t *testing.T) {
 	}
 	want := []string{
 		"type=bind,source=C:\\tmp\\main.go,target=/jail/student/ascii-render/main.go,readonly",
-		"type=bind,source=C:\\tmp\\banner.txt,target=/jail/student/ascii-render/banner.txt,readonly",
+		"type=bind,source=C:\\tmp\\banner.txt,target=/jail/student/ascii-render/resources/banner.txt,readonly",
 	}
 	if len(mounts) != len(want) {
 		t.Fatalf("got %d mounts, want %d: %#v", len(mounts), len(want), mounts)

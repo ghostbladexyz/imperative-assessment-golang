@@ -338,14 +338,14 @@ func upsertWire(items []wireResult, wire wireResult) []wireResult {
 
 func stageOfficialResources(directory, exerciseKey string, resources []assessment.ExerciseResource) ([]dockerResourceMount, error) {
 	slug := strings.TrimPrefix(exerciseKey, "checkpoint/")
-	targetDirectory := "/jail/student/" + slug
+	targetDirectory := "/jail/student/" + slug + "/resources"
 	mounts := make([]dockerResourceMount, 0, len(resources))
 	for _, resource := range resources {
 		if resource.Name == "" || resource.Name == "." || resource.Name == ".." || strings.ContainsAny(resource.Name, "/\\") {
 			return nil, fmt.Errorf("invalid official resource name %q", resource.Name)
 		}
 		sourcePath := filepath.Join(directory, resource.Name)
-		if err := os.WriteFile(sourcePath, []byte(resource.Content), 0o600); err != nil {
+		if err := os.WriteFile(sourcePath, []byte(resource.Content), 0o644); err != nil {
 			return nil, err
 		}
 		mounts = append(mounts, dockerResourceMount{
