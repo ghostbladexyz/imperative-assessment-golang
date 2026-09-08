@@ -200,15 +200,16 @@ function reconcileExercises(
       finiteNonNegative(candidate.bestPassed),
     );
     target.totalTests = level.tests.length;
+    const hintCount = level.instructions.hints?.length ?? 0;
     target.hintsUsed = Array.isArray(candidate.hintsUsed)
       ? candidate.hintsUsed
           .filter(
             (item): item is number =>
               Number.isInteger(item) &&
               Number(item) >= 0 &&
-              Number(item) < level.instructions.hints.length,
+              Number(item) < hintCount,
           )
-          .slice(0, level.instructions.hints.length)
+          .slice(0, hintCount)
       : [];
     target.history = Array.isArray(candidate.history)
       ? candidate.history

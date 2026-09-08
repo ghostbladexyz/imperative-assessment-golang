@@ -81,6 +81,25 @@ describe("progress state", () => {
     expect(reconciled.exercises[changedLevel.key].code).toContain("learner");
   });
 
+  it("preserves saved edits when checkpoint hints are omitted", () => {
+    const checkpointCatalogue = {
+      ...catalogue,
+      levels: levels.map((level) => ({
+        ...level,
+        instructions: { ...level.instructions, hints: null },
+      })),
+    } as unknown as Catalogue;
+    const saved = createProgress(checkpointCatalogue);
+    saved.exercises[levels[0].key].code += "\n// learner";
+    saved.exercises[levels[0].key].receipt = "receipt";
+    saved.exercises[levels[0].key].passed = true;
+
+    const reconciled = validateImport(saved, checkpointCatalogue);
+
+    expect(reconciled.exercises[levels[0].key].code).toContain("learner");
+    expect(reconciled.exercises[levels[0].key].passed).toBe(true);
+  });
+
   it("rejects a foreign schema", () => {
     expect(() => validateImport({ schemaVersion: 99 }, catalogue)).toThrow(/schema version 6 or 4/);
   });

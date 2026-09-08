@@ -112,11 +112,16 @@ function App() {
 
   useEffect(() => {
     if (!progress) return;
-    const handle = window.setTimeout(() => {
+    const persist = () => {
       saveProgress(progress);
       setSaved(true);
-    }, 180);
-    return () => window.clearTimeout(handle);
+    };
+    const handle = window.setTimeout(persist, 180);
+    window.addEventListener("pagehide", persist);
+    return () => {
+      window.clearTimeout(handle);
+      window.removeEventListener("pagehide", persist);
+    };
   }, [progress]);
 
   useEffect(() => {
