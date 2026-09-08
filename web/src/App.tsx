@@ -191,7 +191,6 @@ function App() {
       const nextResult = await runTests(
         level.key,
         levelProgress.code,
-        level.tests.map((test) => test.id),
         controller.signal,
       );
       if (version !== runVersionRef.current) return;
@@ -651,6 +650,7 @@ function App() {
                   />
                   <ExerciseTests
                     tests={level.tests}
+                    result={result}
                     onHide={() => setTestsVisible(false)}
                   />
                 </>
@@ -820,9 +820,11 @@ function Console({
 
 function ExerciseTests({
   tests,
+  result,
   onHide,
 }: {
   tests: Level["tests"];
+  result?: RunResult;
   onHide: () => void;
 }) {
   return (
@@ -836,32 +838,51 @@ function ExerciseTests({
         </button>
       </h2>
       <div className="exercise-test-list">
-        {tests.map((test, index) => (
-          <article
-            className="exercise-test"
-            key={test.id}
-          >
-            <div className="test-title">
-              <span>#{index + 1}</span>
-              <strong>{test.name}</strong>
-            </div>
-            <p>{test.purpose}</p>
-            <dl>
-              <div>
-                <dt>Input</dt>
-                <dd>
-                  <code>{test.input}</code>
-                </dd>
+        {tests.map((test, index) => {
+          const testResult = result?.results.find((item) => item.id === test.id);
+          const status = result ? (testResult?.passed ? "pass" : "fail") : "pending";
+          const label =
+            status === "pass"
+              ? "PASS"
+              : status === "fail"
+                ? "FAIL"
+                : "PENDING";
+          return (
+            <article className="exercise-test" key={test.id}>
+              <div className="test-title">
+                <span>#{index + 1}</span>
+                <strong>{test.name}</strong>
+                <span
+                  className={
+                    status === "pass"
+                      ? "test-result test-result-pass"
+                      : status === "fail"
+                        ? "test-result test-result-fail"
+                        : "test-result test-result-pending"
+                  }
+                  aria-label={label === "PASS" ? "Test passed" : label === "FAIL" ? "Test failed" : "Test pending"}
+                >
+                  {label}
+                </span>
               </div>
-              <div>
-                <dt>Need</dt>
-                <dd>
-                  <code>{test.expected}</code>
-                </dd>
-              </div>
-            </dl>
-          </article>
-        ))}
+              <p>{test.purpose}</p>
+              <dl>
+                <div>
+                  <dt>Input</dt>
+                  <dd>
+                    <code>{test.input}</code>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Need</dt>
+                  <dd>
+                    <code>{test.expected}</code>
+                  </dd>
+                </div>
+              </dl>
+            </article>
+          );
+        })}
       </div>
     </section>
   );

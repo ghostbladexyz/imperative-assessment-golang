@@ -899,7 +899,7 @@ body.resizing-output {
   gap: 8px;
 }
 
-.test-title > span {
+.test-title > span:first-child {
   color: var(--blue);
   font: 8px/1 var(--mono);
 }
@@ -909,6 +909,24 @@ body.resizing-output {
   flex: 1;
   color: #cbd8e5;
   font: 10px/1.25 var(--mono);
+}
+
+.test-result {
+  flex: 0 0 auto;
+  font: 700 8px/1 var(--mono);
+  letter-spacing: 0.08em;
+}
+
+.test-result-pass {
+  color: var(--green);
+}
+
+.test-result-fail {
+  color: var(--red);
+}
+
+.test-result-pending {
+  color: var(--faint);
 }
 
 .exercise-test p {

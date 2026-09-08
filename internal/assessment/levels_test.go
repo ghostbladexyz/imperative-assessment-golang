@@ -83,20 +83,6 @@ func TestPublicLevelsPublishOfficialChecks(t *testing.T) {
 	}
 }
 
-func TestSelectTestsPreservesRequestedOrder(t *testing.T) {
-	level := Levels()[0]
-	first, second, third := level.Tests[0], level.Tests[1], level.Tests[2]
-	selected, valid := SelectTests(level, []string{third.ID, first.ID, second.ID})
-	if !valid {
-		t.Fatal("known test identifiers were rejected")
-	}
-	for index, want := range []string{third.ID, first.ID, second.ID} {
-		if selected[index].ID != want {
-			t.Fatalf("test %d = %q, want %q", index, selected[index].ID, want)
-		}
-	}
-}
-
 func TestCatalogueReturnsDefensiveProjections(t *testing.T) {
 	first := Levels()
 	first[0].Title = "changed"

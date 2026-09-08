@@ -95,7 +95,7 @@ type Info struct {
 }
 
 type Service interface {
-	Run(context.Context, assessment.Level, string, []string) RunResult
+	Run(context.Context, assessment.Level, string) RunResult
 	Format(context.Context, string) (string, error)
 	Info() Info
 }
@@ -152,9 +152,9 @@ func (engine *Engine) Format(_ context.Context, source string) (string, error) {
 	return FormatSource(source)
 }
 
-func (engine *Engine) Run(ctx context.Context, level assessment.Level, source string, testIDs []string) RunResult {
+func (engine *Engine) Run(ctx context.Context, level assessment.Level, source string) RunResult {
 	started := time.Now()
-	result, plan, valid := prepareRun(level, source, testIDs, started)
+	result, plan, valid := prepareRun(level, source, started)
 	if !valid || !engine.acquire(ctx, &result, started) {
 		return result
 	}
@@ -165,7 +165,6 @@ func (engine *Engine) Run(ctx context.Context, level assessment.Level, source st
 		plan,
 		outcome,
 		result,
-		len(plan.tests) == len(level.Tests),
 		started,
 	)
 }
@@ -194,7 +193,6 @@ func (engine *Engine) complete(
 	plan executionPlan,
 	outcome executionOutcome,
 	result RunResult,
-	wholeSuite bool,
 	started time.Time,
 ) RunResult {
 	result.Stdout = outcome.stdout
@@ -251,7 +249,6 @@ func (engine *Engine) complete(
 	}
 
 	result.Passed = outcome.status == executionSuccess &&
-		wholeSuite &&
 		result.PassedCount == len(plan.level.Tests) &&
 		result.CompileError == "" &&
 		result.RuntimeError == "" &&
@@ -287,26 +284,15 @@ func sourceHash(prepared string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func prepareRun(level assessment.Level, source string, testIDs []string, started time.Time) (RunResult, executionPlan, bool) {
+func prepareRun(level assessment.Level, source string, started time.Time) (RunResult, executionPlan, bool) {
 	result := RunResult{ExerciseKey: level.Key, LevelID: level.ID}
 	if len(source) > MaxSourceBytes {
 		result.CompileError = fmt.Sprintf("Source is too large. The limit is %d KiB.", MaxSourceBytes/1024)
 		result.DurationMS = elapsedMS(started)
 		return result, executionPlan{}, false
 	}
-	selected, valid := assessment.SelectTests(level, testIDs)
-	if !valid {
-		result.CompileError = "The request contains an unknown test identifier."
-		result.DurationMS = elapsedMS(started)
-		return result, executionPlan{}, false
-	}
-	if len(selected) != len(level.Tests) {
-		result.CompileError = "The official grader always runs the complete exercise suite."
-		result.DurationMS = elapsedMS(started)
-		return result, executionPlan{}, false
-	}
-	result.TotalCount = len(selected)
-	for _, current := range selected {
+	result.TotalCount = len(level.Tests)
+	for _, current := range level.Tests {
 		result.Results = append(result.Results, TestResult{
 			ID: current.ID, Name: current.Name, Purpose: current.Purpose,
 			Input: current.Input, Expected: current.Expected, Status: "pending",
@@ -322,7 +308,7 @@ func prepareRun(level assessment.Level, source string, testIDs []string, started
 	}
 	return result, executionPlan{
 		level:      level,
-		tests:      selected,
+		tests:      level.Tests,
 		prepared:   prepared,
 		sourceHash: result.SourceHash,
 	}, true

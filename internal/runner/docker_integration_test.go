@@ -34,14 +34,14 @@ func TestDockerRunnerIntegration(t *testing.T) {
 		if source == strings.ReplaceAll(level.StarterCode, "\r\n", "\n") {
 			t.Fatal("correct-solution fixture did not replace the TODO")
 		}
-		result := sandbox.Run(context.Background(), level, source, nil)
+		result := sandbox.Run(context.Background(), level, source)
 		if !result.Passed {
 			t.Fatalf("correct solution failed: %#v", result)
 		}
 	})
 
 	t.Run("starter fails assertions", func(t *testing.T) {
-		result := sandbox.Run(context.Background(), level, level.StarterCode, nil)
+		result := sandbox.Run(context.Background(), level, level.StarterCode)
 		if result.Passed {
 			t.Fatalf("starter unexpectedly passed: %#v", result)
 		}
@@ -54,7 +54,7 @@ func TestDockerRunnerIntegration(t *testing.T) {
 	})
 
 	t.Run("invalid Go returns compiler error", func(t *testing.T) {
-		result := sandbox.Run(context.Background(), level, "package main\nfunc valid([]string) bool { definitely not go }", nil)
+		result := sandbox.Run(context.Background(), level, "package main\nfunc valid([]string) bool { definitely not go }")
 		if result.CompileError == "" {
 			t.Fatalf("missing compiler error: %#v", result)
 		}
@@ -64,7 +64,7 @@ func TestDockerRunnerIntegration(t *testing.T) {
 		for _, current := range assessment.Levels() {
 			current := current
 			t.Run(current.Title, func(t *testing.T) {
-				result := sandbox.Run(context.Background(), current, current.StarterCode, nil)
+				result := sandbox.Run(context.Background(), current, current.StarterCode)
 				if result.FailureKind != "" || result.RuntimeError != "" || result.CompileError != "" {
 					t.Fatalf("official grader integration failed: %#v", result)
 				}

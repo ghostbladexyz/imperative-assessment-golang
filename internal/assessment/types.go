@@ -90,27 +90,6 @@ func (test VisibleTest) MatchesOfficialLabel(label string) bool {
 	return false
 }
 
-func SelectTests(level Level, ids []string) ([]VisibleTest, bool) {
-	if len(ids) == 0 {
-		return level.Tests, true
-	}
-	available := make(map[string]VisibleTest, len(level.Tests))
-	for _, test := range level.Tests {
-		available[test.ID] = test
-	}
-	selected := make([]VisibleTest, 0, len(ids))
-	seen := make(map[string]bool, len(ids))
-	for _, id := range ids {
-		test, found := available[id]
-		if !found || seen[id] {
-			return nil, false
-		}
-		selected = append(selected, test)
-		seen[id] = true
-	}
-	return selected, true
-}
-
 func FindLevel(id int) (Level, bool) {
 	return catalogueFindPosition(id)
 }

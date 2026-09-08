@@ -32,24 +32,30 @@ func TestEngineOwnsPreparationAndCompletion(t *testing.T) {
 		wires = append(wires, wireResult{ID: current.ID, Actual: "pass"})
 	}
 	adapter := &outcomeAdapter{outcome: executionOutcome{status: executionSuccess, results: wires}}
-	result := newEngine(adapter, 1, testIssuer{}).Run(context.Background(), level, level.StarterCode, nil)
+	result := newEngine(adapter, 1, testIssuer{}).Run(context.Background(), level, level.StarterCode)
 	if !result.Passed || result.Receipt == "" || adapter.plan.sourceHash == "" {
 		t.Fatalf("engine did not complete the passing run: %#v", result)
 	}
 }
 
-func TestReorderedCompleteSuiteCountsAsWholeSuite(t *testing.T) {
+func TestEngineUsesCanonicalSuiteOrder(t *testing.T) {
 	level := mustExercise(t, "checkpoint/validate-stack")
-	ids := make([]string, 0, len(level.Tests))
 	wires := make([]wireResult, 0, len(level.Tests))
-	for index := len(level.Tests) - 1; index >= 0; index-- {
-		ids = append(ids, level.Tests[index].ID)
-		wires = append(wires, wireResult{ID: level.Tests[index].ID, Actual: "pass"})
+	for _, current := range level.Tests {
+		wires = append(wires, wireResult{ID: current.ID, Actual: "pass"})
 	}
 	adapter := &outcomeAdapter{outcome: executionOutcome{status: executionSuccess, results: wires}}
-	result := newEngine(adapter, 1, testIssuer{}).Run(context.Background(), level, level.StarterCode, ids)
+	result := newEngine(adapter, 1, testIssuer{}).Run(context.Background(), level, level.StarterCode)
 	if !result.Passed || result.Receipt == "" {
-		t.Fatalf("reordered suite was not complete: %#v", result)
+		t.Fatalf("canonical suite was not complete: %#v", result)
+	}
+	if len(adapter.plan.tests) != len(level.Tests) {
+		t.Fatalf("grader received %d tests, want %d", len(adapter.plan.tests), len(level.Tests))
+	}
+	for index, test := range level.Tests {
+		if adapter.plan.tests[index].ID != test.ID || result.Results[index].ID != test.ID {
+			t.Fatalf("test %d was not canonical: plan=%q result=%q want=%q", index, adapter.plan.tests[index].ID, result.Results[index].ID, test.ID)
+		}
 	}
 }
 

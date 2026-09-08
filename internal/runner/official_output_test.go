@@ -57,7 +57,7 @@ func TestFailedAggregateCannotIssueReceipt(t *testing.T) {
 	for _, test := range level.Tests {
 		outcome.results = append(outcome.results, wireResult{ID: test.ID, Actual: "pass"})
 	}
-	result := newEngine(&outcomeAdapter{outcome: outcome}, 1, testIssuer{}).Run(context.Background(), level, level.StarterCode, nil)
+	result := newEngine(&outcomeAdapter{outcome: outcome}, 1, testIssuer{}).Run(context.Background(), level, level.StarterCode)
 	if result.Passed || result.Receipt != "" {
 		t.Fatalf("failed aggregate completed as pass: %#v", result)
 	}

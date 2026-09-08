@@ -39,7 +39,6 @@ type api struct {
 type runRequest struct {
 	ExerciseKey assessment.ExerciseKey `json:"exerciseKey"`
 	Code        string                 `json:"code"`
-	TestIDs     []string               `json:"testIds"`
 }
 
 type formatRequest struct {
@@ -210,7 +209,7 @@ func (api *api) run(writer http.ResponseWriter, request *http.Request) {
 		writeJSON(writer, http.StatusBadRequest, map[string]string{"error": "unknown exercise"})
 		return
 	}
-	writeJSON(writer, http.StatusOK, api.runner.Run(request.Context(), level, input.Code, input.TestIDs))
+	writeJSON(writer, http.StatusOK, api.runner.Run(request.Context(), level, input.Code))
 }
 
 func (api *api) format(writer http.ResponseWriter, request *http.Request) {

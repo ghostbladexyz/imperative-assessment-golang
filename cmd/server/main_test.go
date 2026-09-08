@@ -18,7 +18,7 @@ type fakeRunner struct {
 	runs int
 }
 
-func (fake *fakeRunner) Run(_ context.Context, level assessment.Level, _ string, _ []string) runner.RunResult {
+func (fake *fakeRunner) Run(_ context.Context, level assessment.Level, _ string) runner.RunResult {
 	fake.runs++
 	return runner.RunResult{ExerciseKey: level.Key, LevelID: level.ID}
 }
@@ -93,7 +93,7 @@ func TestBrowserCannotSelectRunnerMode(t *testing.T) {
 	request := httptest.NewRequest(
 		http.MethodPost,
 		"/api/run",
-		strings.NewReader(`{"exerciseKey":"checkpoint/validate-stack","code":"package main","testIds":[],"runner":"local"}`),
+		strings.NewReader(`{"exerciseKey":"checkpoint/validate-stack","code":"package main","runner":"local"}`),
 	)
 	request.Header.Set("Content-Type", "application/json")
 	response := httptest.NewRecorder()
