@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strings"
 	"time"
 
@@ -132,7 +131,7 @@ func (docker *dockerAdapter) Execute(ctx context.Context, plan executionPlan) ex
 
 	runCtx, cancel := context.WithTimeout(ctx, dockerHostTimeout)
 	command := docker.commands.Run(runCtx, dockerRunOutputLimit, nil, docker.dockerBinary,
-		dockerRunArgs(name, string(plan.level.Key), sourcePath, plan.tests)...)
+		dockerRunArgs(name, string(plan.level.Key), sourcePath)...)
 	cancel()
 	cleanupErr := docker.cleanup(name)
 	if cleanupErr != nil {
@@ -155,7 +154,6 @@ func (docker *dockerAdapter) Execute(ctx context.Context, plan executionPlan) ex
 		}
 		return executionOutcome{status: executionStartup, runtimeError: message, stdout: command.Stdout, stderr: command.Stderr}
 	}
-	outcome.results = orderWireResults(outcome.results, plan.tests)
 	return outcome
 }
 
@@ -226,6 +224,19 @@ func decodeOfficialOutcome(level assessment.Level, stdout, stderr string) (execu
 	}
 	if len(outcome.results) == 0 {
 		return executionOutcome{}, errors.New("grader response contained no recognized checks")
+	}
+	if !envelope.OK {
+		outcome.status = executionRuntime
+		allPassed := true
+		for _, result := range outcome.results {
+			if result.Actual != "pass" || result.Failure != "" {
+				allPassed = false
+				break
+			}
+		}
+		if allPassed {
+			outcome.runtimeError = "The official grader reported a failed suite."
+		}
 	}
 	return outcome, nil
 }
@@ -316,46 +327,18 @@ func upsertWire(items []wireResult, wire wireResult) []wireResult {
 	return append(items, wire)
 }
 
-func dockerRunArgs(name, exerciseKey, sourcePath string, requested ...[]assessment.VisibleTest) []string {
+func dockerRunArgs(name, exerciseKey, sourcePath string) []string {
 	slug := strings.TrimPrefix(exerciseKey, "checkpoint/")
 	target := "/jail/student/" + slug + "/main.go"
-	var tests []assessment.VisibleTest
-	if len(requested) > 0 {
-		tests = requested[0]
-	}
-	order := make([]string, 0, len(tests))
-	for _, test := range tests {
-		order = append(order, test.ID)
-	}
 	return []string{
 		"run", "--name", name, "--label", dockerContainerLabel, "--rm", "--pull", "never",
 		"--platform", dockerPlatform, "--network", "none", "--ipc", "none", "--read-only", "--log-driver", "none", "--hostname", "grader",
 		"--memory", "512m", "--memory-swap", "512m", "--cpus", "1", "--pids-limit", "256",
 		"--ulimit", "nofile=256:256", "--ulimit", "core=0:0",
 		"--tmpfs", "/tmp:rw,exec,nosuid,nodev,size=256m,mode=1777",
-		"--env", "EXERCISE=" + slug, "--env", "FILE=" + slug + "/main.go", "--env", "TEST_ORDER=" + strings.Join(order, ","), "--env", "EMIT_JSON=1",
+		"--env", "EXERCISE=" + slug, "--env", "FILE=" + slug + "/main.go", "--env", "EMIT_JSON=1",
 		"--mount", "type=bind,source=" + sourcePath + ",target=" + target + ",readonly", dockerImage,
 	}
-}
-
-func orderWireResults(items []wireResult, tests []assessment.VisibleTest) []wireResult {
-	positions := make(map[string]int, len(tests))
-	for index, test := range tests {
-		positions[test.ID] = index
-	}
-	ordered := append([]wireResult(nil), items...)
-	sort.SliceStable(ordered, func(left, right int) bool {
-		leftPosition, leftFound := positions[ordered[left].ID]
-		rightPosition, rightFound := positions[ordered[right].ID]
-		if !leftFound {
-			return false
-		}
-		if !rightFound {
-			return true
-		}
-		return leftPosition < rightPosition
-	})
-	return ordered
 }
 
 func cleanupStaleContainers(ctx context.Context, commands CommandExecutor, dockerBinary string) error {

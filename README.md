@@ -46,7 +46,7 @@ the server as a public code-execution service. See [SECURITY.md](SECURITY.md).
   next exercise.
 - Use **Test** for feedback, **gofmt** to format the code, and **.go** to download
   the current editor contents.
-- Drag tests or use their arrow buttons to choose the order in which they run.
+- Tests are shown in the fixed order used by the official grader.
   Program output from `z01.PrintRune` or `fmt.Print*` appears in the console.
 - Progress and editor layout are saved in the browser on the current device.
 - Drag the panel dividers to resize the instructions, editor, tests, and console.
