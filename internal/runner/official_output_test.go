@@ -3,6 +3,8 @@ package runner
 import (
 	"strings"
 	"testing"
+
+	"github.com/pleft/imperative-assessment-golang/internal/assessment"
 )
 
 func TestDecodeOfficialOutcomeMapsPassesAndFailures(t *testing.T) {
@@ -34,7 +36,7 @@ func TestDecodeOfficialOutcomeMapsAggregateFailure(t *testing.T) {
 }
 
 func TestDockerRunUsesOnlyExactSourceMountAndPinnedImage(t *testing.T) {
-	args := dockerRunArgs("imperative-go-assessment-0123456789abcdef01234567", "checkpoint/validate-stack", `C:\\tmp\\main.go`)
+	args := dockerRunArgs("imperative-go-assessment-0123456789abcdef01234567", "checkpoint/validate-stack", `C:\\tmp\\main.go`, nil)
 	joined := strings.Join(args, " ")
 	for _, required := range []string{dockerImage, "--network none", "--read-only", "EMIT_JSON=1", "target=/jail/student/validate-stack/main.go,readonly"} {
 		if !strings.Contains(joined, required) {
@@ -43,5 +45,33 @@ func TestDockerRunUsesOnlyExactSourceMountAndPinnedImage(t *testing.T) {
 	}
 	if strings.Contains(joined, "docker.sock") || strings.Contains(joined, "target=/workspace") {
 		t.Fatalf("unsafe broad mount in %s", joined)
+	}
+}
+
+func TestDockerRunUsesPinnedPlatformAndRequestedTestOrder(t *testing.T) {
+	tests := []assessment.VisibleTest{{ID: "checkpoint-02"}, {ID: "checkpoint-01"}}
+	args := dockerRunArgs("imperative-go-assessment-0123456789abcdef01234567", "checkpoint/validate-stack", `C:\\tmp\\main.go`, tests)
+	options := make(map[string]string)
+	for index := 0; index < len(args); index++ {
+		if args[index] == "--platform" || args[index] == "--env" {
+			if index+1 >= len(args) {
+				t.Fatalf("option %q has no value", args[index])
+			}
+			key, value, found := strings.Cut(args[index+1], "=")
+			if args[index] == "--platform" {
+				options["platform"] = args[index+1]
+				continue
+			}
+			if !found {
+				t.Fatalf("environment entry %q has no key", args[index+1])
+			}
+			options[key] = value
+		}
+	}
+	if options["platform"] != dockerPlatform {
+		t.Fatalf("platform = %q, want %q", options["platform"], dockerPlatform)
+	}
+	if options["TEST_ORDER"] != "checkpoint-02,checkpoint-01" {
+		t.Fatalf("test order = %q", options["TEST_ORDER"])
 	}
 }

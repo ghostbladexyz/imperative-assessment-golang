@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 const (
 	dockerGoVersion      = "official grader toolchain"
 	dockerImage          = "ghcr.io/zone01athens/test-imperative-checkpoint@sha256:6d3501ebb37c4c268177edaa7a0490e601898a25f6426310ad59fae85254b0d7"
+	dockerPlatform       = "linux/amd64"
 	dockerContainerLabel = "io.github.pleft.imperative-assessment.role=official-grader"
 	dockerRunOutputLimit = 4 * 1024 * 1024
 	dockerCleanupTimeout = 5 * time.Second
@@ -86,7 +88,7 @@ func NewDocker(ctx context.Context, options DockerOptions) (*Engine, error) {
 	if inspect.Err != nil {
 		pullCtx, cancel := context.WithTimeout(ctx, options.BuildTimeout)
 		defer cancel()
-		pull := options.Commands.Run(pullCtx, dockerRunOutputLimit, nil, options.DockerBinary, "pull", dockerImage)
+		pull := options.Commands.Run(pullCtx, dockerRunOutputLimit, nil, options.DockerBinary, "pull", "--platform", dockerPlatform, dockerImage)
 		if pull.Err != nil {
 			if errors.Is(pullCtx.Err(), context.DeadlineExceeded) {
 				return nil, errors.New("downloading the pinned official grader timed out")
@@ -130,7 +132,7 @@ func (docker *dockerAdapter) Execute(ctx context.Context, plan executionPlan) ex
 
 	runCtx, cancel := context.WithTimeout(ctx, dockerHostTimeout)
 	command := docker.commands.Run(runCtx, dockerRunOutputLimit, nil, docker.dockerBinary,
-		dockerRunArgs(name, string(plan.level.Key), sourcePath)...)
+		dockerRunArgs(name, string(plan.level.Key), sourcePath, plan.tests)...)
 	cancel()
 	cleanupErr := docker.cleanup(name)
 	if cleanupErr != nil {
@@ -149,11 +151,22 @@ func (docker *dockerAdapter) Execute(ctx context.Context, plan executionPlan) ex
 	if err != nil {
 		message := "The official grader returned an invalid response."
 		if command.Err != nil {
-			message = "The official grader container could not start."
+			message = officialStartupMessage(command.Stdout, command.Stderr)
 		}
 		return executionOutcome{status: executionStartup, runtimeError: message, stdout: command.Stdout, stderr: command.Stderr}
 	}
+	outcome.results = orderWireResults(outcome.results, plan.tests)
 	return outcome
+}
+
+func officialStartupMessage(stdout, stderr string) string {
+	combined := strings.ToLower(stdout + "\n" + stderr)
+	if strings.Contains(combined, "exec format error") ||
+		strings.Contains(combined, "no matching manifest") ||
+		(strings.Contains(combined, "platform") && strings.Contains(combined, "emulat")) {
+		return "The official grader requires Docker linux/amd64 emulation. Enable amd64 emulation in Docker, then rerun the assessment."
+	}
+	return "The official grader container could not start."
 }
 
 type officialEnvelope struct {
@@ -303,18 +316,46 @@ func upsertWire(items []wireResult, wire wireResult) []wireResult {
 	return append(items, wire)
 }
 
-func dockerRunArgs(name, exerciseKey, sourcePath string) []string {
+func dockerRunArgs(name, exerciseKey, sourcePath string, requested ...[]assessment.VisibleTest) []string {
 	slug := strings.TrimPrefix(exerciseKey, "checkpoint/")
 	target := "/jail/student/" + slug + "/main.go"
+	var tests []assessment.VisibleTest
+	if len(requested) > 0 {
+		tests = requested[0]
+	}
+	order := make([]string, 0, len(tests))
+	for _, test := range tests {
+		order = append(order, test.ID)
+	}
 	return []string{
 		"run", "--name", name, "--label", dockerContainerLabel, "--rm", "--pull", "never",
-		"--network", "none", "--ipc", "none", "--read-only", "--log-driver", "none", "--hostname", "grader",
+		"--platform", dockerPlatform, "--network", "none", "--ipc", "none", "--read-only", "--log-driver", "none", "--hostname", "grader",
 		"--memory", "512m", "--memory-swap", "512m", "--cpus", "1", "--pids-limit", "256",
 		"--ulimit", "nofile=256:256", "--ulimit", "core=0:0",
 		"--tmpfs", "/tmp:rw,exec,nosuid,nodev,size=256m,mode=1777",
-		"--env", "EXERCISE=" + slug, "--env", "FILE=" + slug + "/main.go", "--env", "EMIT_JSON=1",
+		"--env", "EXERCISE=" + slug, "--env", "FILE=" + slug + "/main.go", "--env", "TEST_ORDER=" + strings.Join(order, ","), "--env", "EMIT_JSON=1",
 		"--mount", "type=bind,source=" + sourcePath + ",target=" + target + ",readonly", dockerImage,
 	}
+}
+
+func orderWireResults(items []wireResult, tests []assessment.VisibleTest) []wireResult {
+	positions := make(map[string]int, len(tests))
+	for index, test := range tests {
+		positions[test.ID] = index
+	}
+	ordered := append([]wireResult(nil), items...)
+	sort.SliceStable(ordered, func(left, right int) bool {
+		leftPosition, leftFound := positions[ordered[left].ID]
+		rightPosition, rightFound := positions[ordered[right].ID]
+		if !leftFound {
+			return false
+		}
+		if !rightFound {
+			return true
+		}
+		return leftPosition < rightPosition
+	})
+	return ordered
 }
 
 func cleanupStaleContainers(ctx context.Context, commands CommandExecutor, dockerBinary string) error {
