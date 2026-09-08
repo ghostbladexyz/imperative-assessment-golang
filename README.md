@@ -15,6 +15,10 @@ verbatim from the
 - Go 1.23 or newer
 - Docker Desktop or Docker Engine with a running Linux-container daemon
 
+The pinned grader image targets `linux/amd64`. On ARM64 hosts, Docker must
+provide amd64 emulation; otherwise the application reports that emulation must
+be enabled before a run can start.
+
 That is everything needed to run the application. The compiled frontend is
 included in the repository, so students do not need Node.js or npm.
 

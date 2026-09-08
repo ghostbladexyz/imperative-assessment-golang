@@ -24,12 +24,8 @@ _Avoid_: Starter version, default solution
 The way an exercise exposes the value assessed by its tests: either a returned value or exact printed output.
 _Avoid_: Test type, output type
 
-**Advanced Exercise**:
-A capstone exercise with a narrow implementation surface and a system-level contract involving parsing, structured data, errors, HTTP, concurrency, SQL, or non-trivial algorithms. Advanced Exercises follow the imported checkpoint curriculum and do not belong to the frozen schema-v4 positional catalogue.
-_Avoid_: Hard mode, advanced level
-
 **Assessment Track**:
-An independently navigable sequence of exercises with its own first exercise and sequential unlock progression. Switching Assessment Tracks never requires completion of another track.
+A sequence of exercises that shares a teaching order. The current assessment exposes one Core track.
 _Avoid_: Module, global level range
 
 **Official Check**:
