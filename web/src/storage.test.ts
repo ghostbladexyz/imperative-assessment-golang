@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   createProgress,
   isLevelUnlocked,
+  loadProgress,
+  saveProgress,
   sequentialCompleted,
   settleTimer,
   validateImport,
@@ -26,6 +28,32 @@ const catalogue: Catalogue = {
   progressSchemaVersion: 6,
   legacyProgress: { schemaVersion: 4, exerciseKeys: [] },
 };
+
+function installLocalStorage(): () => void {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  const values = new Map<string, string>();
+  const storage = {
+    clear: () => values.clear(),
+    getItem: (key: string) => values.get(key) ?? null,
+    key: (index: number) => [...values.keys()][index] ?? null,
+    removeItem: (key: string) => values.delete(key),
+    setItem: (key: string, value: string) => values.set(key, value),
+    get length() {
+      return values.size;
+    },
+  } as Storage;
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: storage,
+  });
+  return () => {
+    if (previous) {
+      Object.defineProperty(globalThis, "localStorage", previous);
+    } else {
+      Reflect.deleteProperty(globalThis, "localStorage");
+    }
+  };
+}
 
 describe("progress state", () => {
   it("unlocks checkpoint exercises sequentially", () => {
@@ -98,6 +126,25 @@ describe("progress state", () => {
 
     expect(reconciled.exercises[levels[0].key].code).toContain("learner");
     expect(reconciled.exercises[levels[0].key].passed).toBe(true);
+  });
+
+  it("restores edited code and a later exercise from saved local progress", () => {
+    const restoreLocalStorage = installLocalStorage();
+    try {
+      const saved = createProgress(catalogue);
+      saved.currentExerciseKey = levels[1].key;
+      saved.trackExerciseKeys.core = levels[1].key;
+      saved.exercises[levels[0].key].code = "package main\n// learner edit\n";
+
+      saveProgress(saved);
+
+      const reloaded = loadProgress(catalogue);
+      expect(reloaded.currentExerciseKey).toBe(levels[1].key);
+      expect(reloaded.trackExerciseKeys.core).toBe(levels[1].key);
+      expect(reloaded.exercises[levels[0].key].code).toContain("learner edit");
+    } finally {
+      restoreLocalStorage();
+    }
   });
 
   it("rejects a foreign schema", () => {

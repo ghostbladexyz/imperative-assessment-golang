@@ -104,3 +104,28 @@ func TestDockerRunMountsDeclaredResourcesReadOnly(t *testing.T) {
 		}
 	}
 }
+
+func TestDockerRunUsesPinnedAMD64Platform(t *testing.T) {
+	args := dockerRunArgs("imperative-go-assessment-0123456789abcdef01234567", "checkpoint/validate-stack", `C:\tmp\main.go`, nil)
+	for index, argument := range args {
+		if argument != "--platform" {
+			continue
+		}
+		if index+1 >= len(args) {
+			t.Fatal("Docker run platform option has no value")
+		}
+		if args[index+1] != dockerPlatform {
+			t.Fatalf("Docker run platform = %q, want %q", args[index+1], dockerPlatform)
+		}
+		return
+	}
+	t.Fatal("Docker run did not specify a platform")
+}
+
+func TestOfficialStartupMessageExplainsMissingAMD64Emulation(t *testing.T) {
+	want := "The official grader requires Docker linux/amd64 emulation. Enable amd64 emulation in Docker, then rerun the assessment."
+	got := officialStartupMessage("", "standard_init_linux.go: exec format error")
+	if got != want {
+		t.Fatalf("startup message = %q, want %q", got, want)
+	}
+}

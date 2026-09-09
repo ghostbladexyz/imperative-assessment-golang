@@ -1,4 +1,5 @@
 import type { Level, RunResult } from "./types";
+import { displayTestStatus } from "./test-status";
 
 export type ConsoleStream = {
   label: string;
@@ -40,22 +41,51 @@ export function buildConsoleStreams(
     return streams;
   }
 
-  const failed = result.results.find((testResult) => !testResult.passed);
+  const states = tests.map((test, index) => {
+    const testResult = result.results.find((item) => item.id === test.id);
+    return {
+      index,
+      test,
+      testResult,
+      status: displayTestStatus(result, testResult),
+    };
+  });
+  const failed = states.find((state) => state.status === "fail");
   if (failed) {
-    const index = tests.findIndex((test) => test.id === failed.id);
     streams.push({
-      label: `test #${index + 1} failed: ${failed.name}`,
-		value: [
-			`Input: ${failed.input}`,
-			`Need: ${failed.expected}`,
-			`Got: ${failed.failure || failed.actual}`,
-		].join("\n"),
+      label: `test #${failed.index + 1} failed: ${failed.test.name}`,
+      value: [
+        `Input: ${failed.testResult?.input ?? failed.test.input}`,
+        `Need: ${failed.test.expected}`,
+        `Got: ${failed.testResult?.failure || failed.testResult?.actual || ""}`,
+      ].join("\n"),
       error: true,
     });
-  } else if (result.results.length > 0) {
+  } else {
+    const errored = states.find((state) => state.status === "error");
+    if (errored) {
+      streams.push({
+        label: `test #${errored.index + 1} error: ${errored.test.name}`,
+        value: `Error: ${errored.testResult?.failure || "The official grader did not return a result for this check."}`,
+        error: true,
+      });
+    } else {
+      const notRun = states.find((state) => state.status === "not_run");
+      if (notRun) {
+        streams.push({
+          label: `test #${notRun.index + 1} not run: ${notRun.test.name}`,
+          value:
+            notRun.testResult?.failure ||
+            "The official grader stopped before this check ran.",
+          error: false,
+        });
+      }
+    }
+  }
+  if (states.length > 0 && states.every((state) => state.status === "pass")) {
     streams.push({
       label: "tests",
-      value: `All ${result.results.length} tests passed.`,
+      value: `All ${states.length} tests passed.`,
       error: false,
     });
   }

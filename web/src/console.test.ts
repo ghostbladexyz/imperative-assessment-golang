@@ -125,4 +125,50 @@ describe("buildConsoleStreams", () => {
       },
     ]);
   });
+
+  it("does not report a grader-stopped test as failed", () => {
+    const streams = buildConsoleStreams(
+      run({
+        totalCount: 2,
+        results: [
+          {
+            ...tests[0],
+            actual: "[]",
+            passed: true,
+            status: "pass",
+            durationMs: 0,
+          },
+          {
+            ...tests[1],
+            actual: "",
+            passed: false,
+            status: "not_run",
+            failure: "The official grader stopped after an earlier failure.",
+            durationMs: 0,
+          },
+        ],
+      }),
+      tests,
+    );
+
+    expect(streams).toEqual([
+      {
+        label: "test #2 not run: One byte",
+        value: "The official grader stopped after an earlier failure.",
+        error: false,
+      },
+    ]);
+  });
+
+  it("reports a missing grader result as an error", () => {
+    const streams = buildConsoleStreams(run({ totalCount: 2 }), tests);
+
+    expect(streams).toEqual([
+      {
+        label: "test #1 error: Empty input",
+        value: "Error: The official grader did not return a result for this check.",
+        error: true,
+      },
+    ]);
+  });
 });

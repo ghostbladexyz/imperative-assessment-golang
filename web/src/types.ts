@@ -84,7 +84,7 @@ export type ResultStatus =
   | "pass"
   | "assertion"
   | "compile"
-	| "not_run"
+  | "not_run"
   | "runtime";
 
 export interface TestResult extends VisibleTest {

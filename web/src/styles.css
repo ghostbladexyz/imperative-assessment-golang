@@ -925,6 +925,14 @@ body.resizing-output {
   color: var(--red);
 }
 
+.test-result-not_run {
+  color: var(--amber);
+}
+
+.test-result-error {
+  color: var(--red);
+}
+
 .test-result-pending {
   color: var(--faint);
 }

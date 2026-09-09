@@ -34,6 +34,10 @@ import {
 } from "./api";
 import { buildConsoleStreams } from "./console";
 import { loadProgress, saveProgress } from "./storage";
+import {
+  displayTestStatus,
+  displayTestStatusLabel,
+} from "./test-status";
 import type { Level, RunResult, SavedProgress } from "./types";
 
 type PaneSizes = {
@@ -63,12 +67,26 @@ function App() {
   const [fullscreen, setFullscreen] = useState(false);
   const [paneSizes, setPaneSizes] = useState(loadPaneSizes);
   const [testsVisible, setTestsVisible] = useState(loadTestsVisibility);
+  const progressRef = useRef<SavedProgress | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
   const runVersionRef = useRef(0);
   const lastAutoRevisionRef = useRef(0);
   const layoutRef = useRef<HTMLDivElement>(null);
   const workspaceRef = useRef<HTMLElement>(null);
   const outputGridRef = useRef<HTMLDivElement>(null);
+
+  if (progress) progressRef.current = progress;
+
+  const updateProgress = useCallback(
+    (update: (current: SavedProgress) => SavedProgress) => {
+      const current = progressRef.current;
+      if (!current) return;
+      const next = update(current);
+      progressRef.current = next;
+      setProgress(next);
+    },
+    [],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -113,7 +131,9 @@ function App() {
   useEffect(() => {
     if (!progress) return;
     const persist = () => {
-      saveProgress(progress);
+      const latest = progressRef.current;
+      if (!latest) return;
+      saveProgress(latest);
       setSaved(true);
     };
     const handle = window.setTimeout(persist, 180);
@@ -168,8 +188,7 @@ function App() {
         delete next[level.key];
         return next;
       });
-      setProgress((current) => {
-        if (!current) return current;
+      updateProgress((current) => {
         const key = level.key;
         return {
           ...current,
@@ -180,7 +199,7 @@ function App() {
         };
       });
     },
-    [level],
+    [level, updateProgress],
   );
 
   const runAllTests = useCallback(async () => {
@@ -203,8 +222,7 @@ function App() {
         ...current,
         [level.key]: nextResult,
       }));
-      setProgress((current) => {
-        if (!current) return current;
+      updateProgress((current) => {
         const key = level.key;
         const item = current.exercises[key];
         return {
@@ -248,7 +266,7 @@ function App() {
         setRunning(false);
       }
     }
-  }, [editRevision, level, levelProgress]);
+  }, [editRevision, level, levelProgress, updateProgress]);
 
   useEffect(() => {
     if (
@@ -293,26 +311,22 @@ function App() {
   };
 
   const setAutoTest = (autoTest: boolean) => {
-    setProgress((current) =>
-      current
-        ? {
-            ...current,
-            settings: { ...current.settings, autoTest },
-          }
-        : current,
-    );
+    updateProgress((current) => ({
+      ...current,
+      settings: { ...current.settings, autoTest },
+    }));
   };
 
   const selectLevel = (selected: Level | undefined) => {
-    if (!progress || !selected) return;
-    setProgress({
-      ...progress,
+    if (!selected) return;
+    updateProgress((current) => ({
+      ...current,
       currentExerciseKey: selected.key,
       trackExerciseKeys: {
-        ...progress.trackExerciseKeys,
+        ...current.trackExerciseKeys,
         [selected.track]: selected.key,
       },
-    });
+    }));
     setEditRevision(0);
     lastAutoRevisionRef.current = 0;
   };
@@ -845,27 +859,26 @@ function ExerciseTests({
       <div className="exercise-test-list">
         {tests.map((test, index) => {
           const testResult = result?.results.find((item) => item.id === test.id);
-          const status = result ? (testResult?.passed ? "pass" : "fail") : "pending";
-          const label =
+          const status = displayTestStatus(result, testResult);
+          const label = displayTestStatusLabel(status);
+          const ariaLabel =
             status === "pass"
-              ? "PASS"
+              ? "Test passed"
               : status === "fail"
-                ? "FAIL"
-                : "PENDING";
+                ? "Test failed"
+                : status === "not_run"
+                  ? "Test not run"
+                  : status === "error"
+                    ? "Test error"
+                    : "Test pending";
           return (
             <article className="exercise-test" key={test.id}>
               <div className="test-title">
                 <span>#{index + 1}</span>
                 <strong>{test.name}</strong>
                 <span
-                  className={
-                    status === "pass"
-                      ? "test-result test-result-pass"
-                      : status === "fail"
-                        ? "test-result test-result-fail"
-                        : "test-result test-result-pending"
-                  }
-                  aria-label={label === "PASS" ? "Test passed" : label === "FAIL" ? "Test failed" : "Test pending"}
+                  className={`test-result test-result-${status}`}
+                  aria-label={ariaLabel}
                 >
                   {label}
                 </span>
