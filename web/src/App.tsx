@@ -481,10 +481,7 @@ function App() {
           tests: clamp(
             outputRect.right - moveEvent.clientX,
             TESTS_MIN_WIDTH,
-            Math.max(
-              TESTS_MIN_WIDTH,
-              outputRect.width - CONSOLE_MIN_WIDTH - LAYOUT_HANDLE_WIDTH,
-            ),
+            maxTestsWidth(layoutRect.width),
           ),
         };
       });
@@ -1057,6 +1054,7 @@ function loadPaneSizes(): PaneSizes {
     const saved =
       readStoredPaneSizes(PANE_SIZE_KEY) ??
       readStoredPaneSizes(LEGACY_PANE_SIZE_KEY);
+    const testsVisible = loadTestsVisibility();
     const tests = isFiniteNumber(saved?.tests)
       ? Math.max(TESTS_MIN_WIDTH, Math.round(saved.tests))
       : DEFAULT_PANE_SIZES.tests;
@@ -1068,9 +1066,9 @@ function loadPaneSizes(): PaneSizes {
               BRIEF_MIN_WIDTH,
               typeof window === "undefined"
                 ? BRIEF_MAX_WIDTH
-                : maxBriefWidth(window.innerWidth, tests, true),
+                : maxBriefWidth(window.innerWidth, tests, testsVisible),
             )
-          : DEFAULT_PANE_SIZES.brief,
+          : defaultBriefWidth(testsVisible),
       output:
         isFiniteNumber(saved?.output)
           ? Math.max(OUTPUT_MIN_HEIGHT, Math.round(saved.output))
@@ -1095,12 +1093,12 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
-function defaultBriefWidth(): number {
+function defaultBriefWidth(testsVisible = true): number {
   if (typeof window === "undefined") return 560;
   return clamp(
     window.innerWidth * DEFAULT_BRIEF_RATIO,
     BRIEF_MIN_WIDTH,
-    maxBriefWidth(window.innerWidth, DEFAULT_TESTS_WIDTH, true),
+    maxBriefWidth(window.innerWidth, DEFAULT_TESTS_WIDTH, testsVisible),
   );
 }
 
@@ -1129,6 +1127,17 @@ function maxBriefWidth(
         outputGridMinWidth(testsWidth, testsVisible) -
         LAYOUT_HANDLE_WIDTH,
     ),
+  );
+}
+
+function maxTestsWidth(layoutWidth: number): number {
+  return Math.max(
+    TESTS_MIN_WIDTH,
+    layoutWidth -
+      BRIEF_MIN_WIDTH -
+      LAYOUT_HANDLE_WIDTH -
+      CONSOLE_MIN_WIDTH -
+      LAYOUT_HANDLE_WIDTH,
   );
 }
 
