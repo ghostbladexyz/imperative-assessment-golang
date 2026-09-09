@@ -9,6 +9,7 @@ const mermaidFlowchartStart = /^(?:flowchart|graph)\s+(?:TB|TD|BT|RL|LR)(?:\s|$)
 type Mermaid = typeof import("mermaid").default;
 
 let mermaidModule: Promise<Mermaid> | null = null;
+let mermaidRenderSequence = 0;
 
 export function isMermaidSource(source: string): boolean {
   return mermaidFlowchartStart.test(source.trim());
@@ -56,8 +57,9 @@ export function MermaidDiagram({ source }: MermaidDiagramProps) {
 
       try {
         const mermaid = await loadMermaid();
+        const renderId = `${diagramId}-${++mermaidRenderSequence}`;
         const { svg, bindFunctions } = await mermaid.render(
-          diagramId,
+          renderId,
           source.trim(),
         );
         if (cancelled || !containerRef.current) return;

@@ -8,7 +8,8 @@ import (
 
 const checkpointUpstreamCommit = "9ef45ee4a164b6d9b8ff3c5ad9b97753c3d63297"
 
-// checkpointAssets are copied byte-for-byte from the pinned upstream commit.
+// checkpointAssets mirror the pinned upstream commit, with README.md flowchart
+// fences annotated for the embedded frontend.
 //
 //go:embed checkpoint
 var checkpointAssets embed.FS

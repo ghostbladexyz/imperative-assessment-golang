@@ -737,6 +737,7 @@ function App() {
                 tests={level.tests}
                 running={running}
                 testsVisible={testsPanelVisible}
+                testsAutoHidden={testsAutoHidden}
                 onShowTests={() => setTestsVisible(true)}
               />
               {testsPanelVisible ? (
@@ -904,12 +905,14 @@ function Console({
   tests,
   running,
   testsVisible,
+  testsAutoHidden,
   onShowTests,
 }: {
   result?: RunResult;
   tests: Level["tests"];
   running: boolean;
   testsVisible: boolean;
+  testsAutoHidden: boolean;
   onShowTests: () => void;
 }) {
   const streams = buildConsoleStreams(result, tests);
@@ -920,7 +923,7 @@ function Console({
         <span>
           <Terminal /> Console
         </span>
-        {!testsVisible ? (
+        {!testsVisible && !testsAutoHidden ? (
           <button onClick={onShowTests} title="Show exercise tests">
             <Eye /> Show tests
           </button>
