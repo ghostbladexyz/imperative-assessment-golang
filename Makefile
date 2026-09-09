@@ -10,7 +10,7 @@ DOCKER ?= docker
 
 help:
 	@echo "Usage:"
-	@echo "  make run               Start with the default Docker sandbox"
+	@echo "  make run               Start with the digest-pinned official Docker grader"
 	@echo "  make check             Run formatting, vet, tests, lint, and frontend build"
 	@echo "  make frontend-install  Install locked frontend dependencies"
 	@echo "  make frontend-dev      Start the Vite development server"

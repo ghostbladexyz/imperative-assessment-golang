@@ -22,7 +22,7 @@ Thank you for helping improve the assessment. Contributions may include exercise
 ## Development Requirements
 
 - Go 1.23 or newer
-- Docker Desktop or Docker Engine for the default sandbox and Docker checks
+- Docker Desktop or Docker Engine for the digest-pinned official grader and Docker checks
 - Node.js 24 and npm when changing the frontend
 - GNU Make is optional; every target maps to standard Go, npm, or Docker commands
 

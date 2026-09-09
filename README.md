@@ -76,7 +76,7 @@ Common targets:
 
 | Target | Purpose |
 | --- | --- |
-| `make run` | Start with the Docker sandbox |
+| `make run` | Start with the digest-pinned official Docker grader |
 | `make check` | Run Go and frontend verification |
 | `make frontend-dev` | Start the Vite development server |
 | `make frontend-build` | Rebuild the embedded frontend |
