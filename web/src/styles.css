@@ -146,7 +146,17 @@ button:disabled {
 .practice-layout {
   min-height: 0;
   display: grid;
-  grid-template-columns: var(--brief-width, 340px) 7px minmax(0, 1fr);
+  --output-grid-min-width: 767px;
+  grid-template-columns:
+    minmax(
+      320px,
+      min(
+        var(--brief-width, 54vw),
+        calc(100% - var(--output-grid-min-width) - 7px)
+      )
+    )
+    7px
+    minmax(var(--output-grid-min-width), 1fr);
   overflow: hidden;
   background: var(--bg);
 }
@@ -247,6 +257,55 @@ button:disabled {
 }
 
 .subject-markdown pre code { color: inherit; }
+
+.mermaid-diagram {
+  margin: 18px 0 24px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background:
+    radial-gradient(circle at 50% 0%, rgb(80 123 119 / 11%), transparent 70%),
+    #101824;
+}
+
+.mermaid-canvas {
+  min-height: 150px;
+  padding: 16px 12px;
+  overflow-x: auto;
+  text-align: center;
+}
+
+.mermaid-canvas svg {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  height: auto;
+  vertical-align: middle;
+}
+
+.mermaid-error {
+  margin: 0 12px 12px;
+  padding: 9px 10px;
+  border: 1px solid rgb(255 113 133 / 35%);
+  background: rgb(255 113 133 / 7%);
+  color: var(--red);
+  font: 10px/1.5 var(--mono);
+}
+
+.mermaid-error summary {
+  cursor: pointer;
+}
+
+.mermaid-error pre {
+  margin: 8px 0 0;
+  color: #ffc2cb;
+}
+
+.mermaid-error small {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+}
 
 .subject-markdown table {
   width: 100%;
@@ -780,7 +839,7 @@ body.resizing-output {
 .output-grid {
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(280px, 1fr) 7px var(--tests-width, 480px);
+  grid-template-columns: minmax(280px, 1fr) 7px minmax(280px, var(--tests-width, 480px));
   overflow: hidden;
 }
 
@@ -1028,7 +1087,7 @@ body.resizing-output {
   }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   body {
     overflow: auto;
   }

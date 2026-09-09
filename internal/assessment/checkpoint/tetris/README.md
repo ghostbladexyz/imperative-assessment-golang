@@ -27,7 +27,7 @@ are also provided; you do not need to redesign them.
 The provided printer writes each grid row followed by a newline. Your two
 functions must produce no other output.
 
-```
+```mermaid
 flowchart LR
     F["file path · string"] --> P["parse pieces · provided"]
     P -->|"[]Piece"| B["backtrack + minimum side · provided"]

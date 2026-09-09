@@ -40,7 +40,7 @@ sa
 rra
 ```
 
-```
+```mermaid
 flowchart LR
     A["command-line args · []string"] --> P["parse into a · provided"]
     P -->|"a []int · top at a[0]; b []int · empty"| S["sort · TODO"]

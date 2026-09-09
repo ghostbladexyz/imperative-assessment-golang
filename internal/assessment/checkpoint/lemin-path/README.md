@@ -26,7 +26,7 @@ followed by one newline. Print no other output.
 For example, if both `start-a-end` and `start-b-end` exist, either
 `[]string{"start", "a", "end"}` or `[]string{"start", "b", "end"}` is valid.
 
-```
+```mermaid
 flowchart LR
     F["colony file path · string"] --> P["parseColony · provided"]
     P -->|"*Colony { Start, End, Adj }"| S["shortestPath · TODO"]

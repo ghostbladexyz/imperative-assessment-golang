@@ -27,7 +27,7 @@ per input line, including a newline after the final line. Output fields are
 separated by one space; column alignment and filesystem access are outside this
 exercise.
 
-```
+```mermaid
 flowchart LR
     F["input file"] --> L["metadata lines · provided"]
     L --> P["parse Meta · provided"]

@@ -26,7 +26,7 @@ Examples:
 
 ## Skeleton map
 
-```
+```mermaid
 flowchart LR
     F["colony file · path"] --> P["parseColony<br/>(provided)"]
     P -->|"*Colony"| D["derivePaths<br/>(provided)"]

@@ -1,4 +1,6 @@
 import {
+  Children,
+  isValidElement,
   type PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
@@ -33,6 +35,7 @@ import {
   validateReceipts,
 } from "./api";
 import { buildConsoleStreams } from "./console";
+import { isMermaidSource, MermaidDiagram } from "./MermaidDiagram";
 import { loadProgress, saveProgress } from "./storage";
 import {
   displayTestStatus,
@@ -48,12 +51,21 @@ type PaneSizes = {
 
 type ResizeKind = keyof PaneSizes;
 
-const PANE_SIZE_KEY = "imperative-go-assessment:pane-sizes:v1";
+const PANE_SIZE_KEY = "imperative-go-assessment:pane-sizes:v2";
+const LEGACY_PANE_SIZE_KEY = "imperative-go-assessment:pane-sizes:v1";
 const TESTS_VISIBILITY_KEY = "imperative-go-assessment:tests-visible:v1";
+const DEFAULT_BRIEF_RATIO = 0.54;
+const BRIEF_MIN_WIDTH = 320;
+const BRIEF_MAX_WIDTH = 760;
+const DEFAULT_TESTS_WIDTH = 480;
+const CONSOLE_MIN_WIDTH = 280;
+const TESTS_MIN_WIDTH = 280;
+const OUTPUT_MIN_HEIGHT = 160;
+const LAYOUT_HANDLE_WIDTH = 7;
 const DEFAULT_PANE_SIZES: PaneSizes = {
-  brief: 340,
+  brief: defaultBriefWidth(),
   output: 250,
-  tests: 480,
+  tests: DEFAULT_TESTS_WIDTH,
 };
 
 function App() {
@@ -67,6 +79,7 @@ function App() {
   const [fullscreen, setFullscreen] = useState(false);
   const [paneSizes, setPaneSizes] = useState(loadPaneSizes);
   const [testsVisible, setTestsVisible] = useState(loadTestsVisibility);
+  const [testsAutoHidden, setTestsAutoHidden] = useState(false);
   const progressRef = useRef<SavedProgress | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
   const runVersionRef = useRef(0);
@@ -74,6 +87,7 @@ function App() {
   const layoutRef = useRef<HTMLDivElement>(null);
   const workspaceRef = useRef<HTMLElement>(null);
   const outputGridRef = useRef<HTMLDivElement>(null);
+  const testsPanelVisible = testsVisible && !testsAutoHidden;
 
   if (progress) progressRef.current = progress;
 
@@ -160,6 +174,39 @@ function App() {
   useEffect(() => {
     localStorage.setItem(TESTS_VISIBILITY_KEY, String(testsVisible));
   }, [testsVisible]);
+
+  useEffect(() => {
+    if (!testsVisible) {
+      setTestsAutoHidden(false);
+      return;
+    }
+
+    const updateTestsAvailability = () => {
+      const layoutWidth = layoutRef.current?.getBoundingClientRect().width;
+      if (!layoutWidth) return;
+      if (window.matchMedia("(max-width: 620px)").matches) {
+        setTestsAutoHidden(false);
+        return;
+      }
+      const outputMinimum = outputGridMinWidth(paneSizes.tests, true);
+      const layoutMinimum = window.matchMedia("(max-width: 1100px)").matches
+        ? outputMinimum
+        : BRIEF_MIN_WIDTH + LAYOUT_HANDLE_WIDTH + outputMinimum;
+      setTestsAutoHidden(layoutWidth < layoutMinimum);
+    };
+
+    updateTestsAvailability();
+    window.addEventListener("resize", updateTestsAvailability);
+    const observer =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(updateTestsAvailability);
+    if (layoutRef.current) observer?.observe(layoutRef.current);
+    return () => {
+      window.removeEventListener("resize", updateTestsAvailability);
+      observer?.disconnect();
+    };
+  }, [levels.length, paneSizes.tests, progress !== null, testsVisible]);
 
   const level = useMemo(
     () =>
@@ -394,7 +441,7 @@ function App() {
     kind: ResizeKind,
     event: ReactPointerEvent<HTMLDivElement>,
   ) => {
-    if (window.matchMedia("(max-width: 900px)").matches) return;
+    if (window.matchMedia("(max-width: 1100px)").matches) return;
     event.preventDefault();
     const layoutRect = layoutRef.current?.getBoundingClientRect();
     const workspaceRect = workspaceRef.current?.getBoundingClientRect();
@@ -409,8 +456,12 @@ function App() {
             ...current,
             brief: clamp(
               moveEvent.clientX - layoutRect.left,
-              240,
-              Math.max(280, Math.min(560, layoutRect.width - 520)),
+              BRIEF_MIN_WIDTH,
+              maxBriefWidth(
+                layoutRect.width,
+                paneSizes.tests,
+                testsPanelVisible,
+              ),
             ),
           };
         }
@@ -429,8 +480,8 @@ function App() {
           ...current,
           tests: clamp(
             outputRect.right - moveEvent.clientX,
-            280,
-            Math.max(320, outputRect.width - 320),
+            TESTS_MIN_WIDTH,
+            maxTestsWidth(layoutRect.width),
           ),
         };
       });
@@ -447,10 +498,41 @@ function App() {
   };
 
   const nudgePane = (kind: ResizeKind, delta: number) => {
-    setPaneSizes((current) => ({
-      ...current,
-      [kind]: Math.max(160, current[kind] + delta),
-    }));
+    setPaneSizes((current) => {
+      if (kind === "brief") {
+        const layoutWidth = layoutRef.current?.getBoundingClientRect().width;
+        return {
+          ...current,
+          brief: clamp(
+            current.brief + delta,
+            BRIEF_MIN_WIDTH,
+            layoutWidth
+              ? maxBriefWidth(
+                  layoutWidth,
+                  current.tests,
+                  testsPanelVisible,
+                )
+              : BRIEF_MAX_WIDTH,
+          ),
+        };
+      }
+      if (kind === "tests") {
+        const layoutWidth =
+          layoutRef.current?.getBoundingClientRect().width ?? window.innerWidth;
+        return {
+          ...current,
+          tests: clamp(
+            current.tests + delta,
+            TESTS_MIN_WIDTH,
+            maxTestsWidth(layoutWidth),
+          ),
+        };
+      }
+      return {
+        ...current,
+        [kind]: Math.max(OUTPUT_MIN_HEIGHT, current[kind] + delta),
+      };
+    });
   };
 
   const resetPane = (kind: ResizeKind) => {
@@ -527,6 +609,10 @@ function App() {
         style={
           {
             "--brief-width": `${paneSizes.brief}px`,
+            "--output-grid-min-width": `${outputGridMinWidth(
+              paneSizes.tests,
+              testsPanelVisible,
+            )}px`,
           } as React.CSSProperties
         }
       >
@@ -643,7 +729,7 @@ function App() {
             </div>
 
             <div
-              className={`output-grid${testsVisible ? "" : " tests-hidden"}`}
+              className={`output-grid${testsPanelVisible ? "" : " tests-hidden"}`}
               ref={outputGridRef}
               style={
                 {
@@ -655,10 +741,11 @@ function App() {
                 result={result}
                 tests={level.tests}
                 running={running}
-                testsVisible={testsVisible}
+                testsVisible={testsPanelVisible}
+                testsAutoHidden={testsAutoHidden}
                 onShowTests={() => setTestsVisible(true)}
               />
-              {testsVisible ? (
+              {testsPanelVisible ? (
                 <>
                   <ResizeHandle
                     orientation="vertical"
@@ -735,7 +822,36 @@ function ExerciseBrief({ level, passed }: { level: Level; passed: boolean }) {
       </div>
 
       <section className="subject-markdown">
-        <Markdown>{level.subject}</Markdown>
+        <Markdown
+          components={{
+            code({ className, children, ...props }) {
+              const language = /language-(\w+)/.exec(className ?? "")?.[1];
+              const rawSource = String(children);
+              const source = rawSource.replace(/\n$/, "");
+              const isUnlabeledBlock = !className && rawSource.endsWith("\n");
+              if (
+                language === "mermaid" ||
+                (isUnlabeledBlock && isMermaidSource(source))
+              ) {
+                return <MermaidDiagram source={source} />;
+              }
+              return (
+                <code className={className} {...props}>
+                  {children}
+                </code>
+              );
+            },
+            pre({ children, ...props }) {
+              const child = Children.toArray(children)[0];
+              if (isValidElement(child) && child.type === MermaidDiagram) {
+                return child;
+              }
+              return <pre {...props}>{children}</pre>;
+            },
+          }}
+        >
+          {level.subject}
+        </Markdown>
         {(level.resources ?? []).map((resource) => (
           <details className="exercise-resource" key={resource.name}>
             <summary>Provided resource · {resource.name}</summary>
@@ -794,12 +910,14 @@ function Console({
   tests,
   running,
   testsVisible,
+  testsAutoHidden,
   onShowTests,
 }: {
   result?: RunResult;
   tests: Level["tests"];
   running: boolean;
   testsVisible: boolean;
+  testsAutoHidden: boolean;
   onShowTests: () => void;
 }) {
   const streams = buildConsoleStreams(result, tests);
@@ -810,7 +928,7 @@ function Console({
         <span>
           <Terminal /> Console
         </span>
-        {!testsVisible ? (
+        {!testsVisible && !testsAutoHidden ? (
           <button onClick={onShowTests} title="Show exercise tests">
             <Eye /> Show tests
           </button>
@@ -939,24 +1057,104 @@ function failedRun(
 
 function loadPaneSizes(): PaneSizes {
   try {
-    const saved = JSON.parse(localStorage.getItem(PANE_SIZE_KEY) ?? "");
+    const saved =
+      readStoredPaneSizes(PANE_SIZE_KEY) ??
+      readStoredPaneSizes(LEGACY_PANE_SIZE_KEY);
+    const testsVisible = loadTestsVisibility();
+    const tests = isFiniteNumber(saved?.tests)
+      ? Math.max(TESTS_MIN_WIDTH, Math.round(saved.tests))
+      : DEFAULT_PANE_SIZES.tests;
     return {
       brief:
-        typeof saved.brief === "number"
-          ? saved.brief
-          : DEFAULT_PANE_SIZES.brief,
+        isFiniteNumber(saved?.brief)
+          ? clamp(
+              saved.brief,
+              BRIEF_MIN_WIDTH,
+              typeof window === "undefined"
+                ? BRIEF_MAX_WIDTH
+                : maxSavedBriefWidth(window.innerWidth, tests, testsVisible),
+            )
+          : defaultBriefWidth(testsVisible),
       output:
-        typeof saved.output === "number"
-          ? saved.output
+        isFiniteNumber(saved?.output)
+          ? Math.max(OUTPUT_MIN_HEIGHT, Math.round(saved.output))
           : DEFAULT_PANE_SIZES.output,
-      tests:
-        typeof saved.tests === "number"
-          ? saved.tests
-          : DEFAULT_PANE_SIZES.tests,
+      tests,
     };
   } catch {
     return DEFAULT_PANE_SIZES;
   }
+}
+
+function readStoredPaneSizes(key: string): Partial<PaneSizes> | null {
+  const raw = localStorage.getItem(key);
+  if (!raw) return null;
+  const saved: unknown = JSON.parse(raw);
+  return saved && typeof saved === "object"
+    ? (saved as Partial<PaneSizes>)
+    : null;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function defaultBriefWidth(testsVisible = true): number {
+  if (typeof window === "undefined") return 560;
+  return clamp(
+    window.innerWidth * DEFAULT_BRIEF_RATIO,
+    BRIEF_MIN_WIDTH,
+    maxSavedBriefWidth(window.innerWidth, DEFAULT_TESTS_WIDTH, testsVisible),
+  );
+}
+
+function outputGridMinWidth(
+  testsWidth: number,
+  testsVisible: boolean,
+): number {
+  if (!testsVisible) return CONSOLE_MIN_WIDTH;
+  return (
+    CONSOLE_MIN_WIDTH +
+    LAYOUT_HANDLE_WIDTH +
+    Math.max(TESTS_MIN_WIDTH, testsWidth)
+  );
+}
+
+function maxBriefWidth(
+  layoutWidth: number,
+  testsWidth: number,
+  testsVisible: boolean,
+): number {
+  return Math.max(
+    BRIEF_MIN_WIDTH,
+    Math.min(
+      BRIEF_MAX_WIDTH,
+      layoutWidth -
+        outputGridMinWidth(testsWidth, testsVisible) -
+        LAYOUT_HANDLE_WIDTH,
+    ),
+  );
+}
+
+function maxSavedBriefWidth(
+  viewportWidth: number,
+  testsWidth: number,
+  testsVisible: boolean,
+): number {
+  return viewportWidth <= 1100
+    ? BRIEF_MAX_WIDTH
+    : maxBriefWidth(viewportWidth, testsWidth, testsVisible);
+}
+
+function maxTestsWidth(layoutWidth: number): number {
+  return Math.max(
+    TESTS_MIN_WIDTH,
+    layoutWidth -
+      BRIEF_MIN_WIDTH -
+      LAYOUT_HANDLE_WIDTH -
+      CONSOLE_MIN_WIDTH -
+      LAYOUT_HANDLE_WIDTH,
+  );
 }
 
 function loadTestsVisibility(): boolean {

@@ -21,7 +21,7 @@ existing newline separators, and do not append a newline that was not present.
 
 ### How it fits
 
-```
+```mermaid
 flowchart LR
     Input["input line<br/>string"] --> Tokenize["tokenize (provided)"]
     Tokenize -->|"[]Token"| Resolve["resolve (TODO)<br/>two marked regions"]

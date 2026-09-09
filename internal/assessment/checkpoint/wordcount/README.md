@@ -30,7 +30,7 @@ java 2
 
 The file reading, counting, and output formatting are provided:
 
-```
+```mermaid
 flowchart LR
     A["input file"] --> B["provided counting"]
     B --> C["orderedWords — TODO"]
