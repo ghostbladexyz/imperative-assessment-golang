@@ -1,4 +1,4 @@
-# Contributing to Imperative Go Practice Assessment
+# Contributing to Imperative Checkpoint Practice Assessment
 
 Thank you for helping improve the assessment. Contributions may include exercise corrections, runner and sandbox improvements, frontend changes, tests, and documentation.
 
@@ -22,7 +22,7 @@ Thank you for helping improve the assessment. Contributions may include exercise
 ## Development Requirements
 
 - Go 1.23 or newer
-- Docker Desktop or Docker Engine for the default sandbox and Docker checks
+- Docker Desktop or Docker Engine for the digest-pinned official grader and Docker checks
 - Node.js 24 and npm when changing the frontend
 - GNU Make is optional; every target maps to standard Go, npm, or Docker commands
 
@@ -35,12 +35,10 @@ npm --prefix web ci
 ## Project Structure
 
 - `cmd/server/` starts the local assessment server.
-- `cmd/sandbox-runner/` contains the process used inside the Docker sandbox.
-- `internal/assessment/` defines the exercise catalogue, authoring rules, and generated test harnesses.
-- `internal/runner/` executes submissions through the local or Docker runner.
+- `internal/assessment/` defines the exercise catalogue and official-check manifest.
+- `internal/runner/` invokes the digest-pinned official grader and maps its results.
 - `internal/web/` embeds the compiled frontend.
 - `web/` contains the React and TypeScript frontend source.
-- `docker/runner.Dockerfile` defines the pinned sandbox image.
 - `.github/workflows/ci.yml` is the authoritative continuous-integration workflow.
 
 ## Code Standards
@@ -71,13 +69,7 @@ npm --prefix web test
 npm --prefix web run build
 ```
 
-Changes affecting the sandbox should also build its image:
-
-```sh
-make docker-build
-```
-
-The opt-in Docker integration test is available with:
+Changes affecting grader integration should run the opt-in Docker suite:
 
 ```sh
 make docker-test

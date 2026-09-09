@@ -1,0 +1,87 @@
+// PROVIDED: fetch/decode and reporting. Complete the TODO inside run.
+package main
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"sort"
+	"strings"
+)
+
+type artists struct {
+	Artists []struct {
+		ID         int    `json:"id"`
+		Name       string `json:"name"`
+		FirstAlbum string `json:"firstAlbum"`
+	} `json:"artists"`
+}
+type locations struct {
+	Index []struct {
+		ID   int    `json:"id"`
+		Name string `json:"name"`
+	} `json:"index"`
+}
+type relations struct {
+	Index []struct {
+		ArtistID    int   `json:"artistId"`
+		LocationIDs []int `json:"locationIds"`
+	} `json:"index"`
+}
+
+// getJSON GETs url, checks the status code, and decodes the body into v. It
+// returns an error (never panics) on a transport failure, a non-200 status,
+// or a body that doesn't unmarshal into v.
+func getJSON(url string, v any) error {
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("GET %s: status %d", url, resp.StatusCode)
+	}
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(b, v)
+}
+
+func run(base, target string) (string, error) {
+	var arts artists
+	var locs locations
+	var rels relations
+	for _, f := range []struct {
+		path string
+		v    any
+	}{{"/artists", &arts}, {"/locations", &locs}, {"/relation", &rels}} {
+		if err := getJSON(base+f.path, f.v); err != nil {
+			return "", err
+		}
+	}
+
+	// TODO: implement the join and return value.
+	_ = errors.New
+	_ = sort.Strings
+	_ = strings.Join
+	_ = target
+	return "", nil
+}
+
+func main() {
+	base := os.Getenv("API_URL")
+	if len(os.Args) < 2 {
+		fmt.Fprintln(os.Stderr, "usage: client <artist>")
+		os.Exit(1)
+	}
+	out, err := run(base, os.Args[1])
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	fmt.Print(out)
+}

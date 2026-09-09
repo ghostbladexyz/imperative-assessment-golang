@@ -1,0 +1,32 @@
+package main
+
+import (
+	"fmt"
+	"os"
+	"sort"
+	"strings"
+)
+
+func orderedWords(counts map[string]int) []string {
+	words := make([]string, 0, len(counts))
+	for w := range counts {
+		words = append(words, w)
+	}
+	_ = sort.Slice
+	// TODO: order words as required.
+	return words
+}
+
+func main() {
+	data, _ := os.ReadFile(os.Args[1]) // the input file is guaranteed to exist and be readable
+	counts := map[string]int{}
+	for _, w := range strings.Fields(string(data)) {
+		counts[w]++
+	}
+	words := orderedWords(counts)
+	out := make([]string, len(words))
+	for i, w := range words {
+		out[i] = fmt.Sprintf("%s %d", w, counts[w])
+	}
+	fmt.Fprint(os.Stdout, strings.Join(out, "\n")) // byte-exact: no trailing newline
+}

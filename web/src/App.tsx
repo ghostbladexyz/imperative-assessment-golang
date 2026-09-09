@@ -2,24 +2,21 @@ import {
   type PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { go } from "@codemirror/lang-go";
+import Markdown from "react-markdown";
 import {
   ArrowLeft,
   ArrowRight,
-  ArrowDown,
-  ArrowUp,
   Check,
   Copy,
   Download,
   Eye,
   EyeOff,
-  GripVertical,
   ListChecks,
   Maximize2,
   Minimize2,
@@ -37,13 +34,11 @@ import {
 } from "./api";
 import { buildConsoleStreams } from "./console";
 import { loadProgress, saveProgress } from "./storage";
-import { constrainDragTop, reorderTests } from "./test-order";
-import type {
-  AssessmentTrack,
-  Level,
-  RunResult,
-  SavedProgress,
-} from "./types";
+import {
+  displayTestStatus,
+  displayTestStatusLabel,
+} from "./test-status";
+import type { Level, RunResult, SavedProgress } from "./types";
 
 type PaneSizes = {
   brief: number;
@@ -72,13 +67,26 @@ function App() {
   const [fullscreen, setFullscreen] = useState(false);
   const [paneSizes, setPaneSizes] = useState(loadPaneSizes);
   const [testsVisible, setTestsVisible] = useState(loadTestsVisibility);
-  const [testOrders, setTestOrders] = useState<Record<string, string[]>>({});
+  const progressRef = useRef<SavedProgress | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
   const runVersionRef = useRef(0);
   const lastAutoRevisionRef = useRef(0);
   const layoutRef = useRef<HTMLDivElement>(null);
   const workspaceRef = useRef<HTMLElement>(null);
   const outputGridRef = useRef<HTMLDivElement>(null);
+
+  if (progress) progressRef.current = progress;
+
+  const updateProgress = useCallback(
+    (update: (current: SavedProgress) => SavedProgress) => {
+      const current = progressRef.current;
+      if (!current) return;
+      const next = update(current);
+      progressRef.current = next;
+      setProgress(next);
+    },
+    [],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -122,11 +130,18 @@ function App() {
 
   useEffect(() => {
     if (!progress) return;
-    const handle = window.setTimeout(() => {
-      saveProgress(progress);
+    const persist = () => {
+      const latest = progressRef.current;
+      if (!latest) return;
+      saveProgress(latest);
       setSaved(true);
-    }, 180);
-    return () => window.clearTimeout(handle);
+    };
+    const handle = window.setTimeout(persist, 180);
+    window.addEventListener("pagehide", persist);
+    return () => {
+      window.clearTimeout(handle);
+      window.removeEventListener("pagehide", persist);
+    };
   }, [progress]);
 
   useEffect(() => {
@@ -151,18 +166,7 @@ function App() {
       levels.find((item) => item.key === progress?.currentExerciseKey) ?? levels[0],
     [levels, progress?.currentExerciseKey],
   );
-  const activeTrack = level?.track ?? "core";
-  const trackLevels = useMemo(
-    () => levels.filter((item) => item.track === activeTrack),
-    [activeTrack, levels],
-  );
-  const trackCounts = useMemo(
-    () => ({
-      core: levels.filter((item) => item.track === "core").length,
-      advanced: levels.filter((item) => item.track === "advanced").length,
-    }),
-    [levels],
-  );
+  const trackLevels = levels;
   const trackIndex = useMemo(
     () => trackLevels.findIndex((item) => item.key === level?.key),
     [level?.key, trackLevels],
@@ -170,32 +174,6 @@ function App() {
   const levelProgress =
     progress && level ? progress.exercises[level.key] : undefined;
   const result = level ? runs[level.key] : undefined;
-  const orderedTests = useMemo(() => {
-    if (!level) return [];
-    const savedOrder = testOrders[level.key];
-    if (!savedOrder) return level.tests;
-    const byID = new Map(level.tests.map((test) => [test.id, test]));
-    const ordered = savedOrder.flatMap((id) => {
-      const test = byID.get(id);
-      if (!test) return [];
-      byID.delete(id);
-      return [test];
-    });
-    return [...ordered, ...byID.values()];
-  }, [level, testOrders]);
-
-  const moveTest = useCallback(
-    (movingID: string, targetID: string) => {
-      if (!level) return;
-      const reordered = reorderTests(orderedTests, movingID, targetID);
-      setTestOrders((current) => ({
-        ...current,
-        [level.key]: reordered.map((test) => test.id),
-      }));
-    },
-    [level, orderedTests],
-  );
-
   const updateCode = useCallback(
     (code: string) => {
       if (!level) return;
@@ -210,8 +188,7 @@ function App() {
         delete next[level.key];
         return next;
       });
-      setProgress((current) => {
-        if (!current) return current;
+      updateProgress((current) => {
         const key = level.key;
         return {
           ...current,
@@ -222,7 +199,7 @@ function App() {
         };
       });
     },
-    [level],
+    [level, updateProgress],
   );
 
   const runAllTests = useCallback(async () => {
@@ -238,7 +215,6 @@ function App() {
       const nextResult = await runTests(
         level.key,
         levelProgress.code,
-        orderedTests.map((test) => test.id),
         controller.signal,
       );
       if (version !== runVersionRef.current) return;
@@ -246,8 +222,7 @@ function App() {
         ...current,
         [level.key]: nextResult,
       }));
-      setProgress((current) => {
-        if (!current) return current;
+      updateProgress((current) => {
         const key = level.key;
         const item = current.exercises[key];
         return {
@@ -291,7 +266,7 @@ function App() {
         setRunning(false);
       }
     }
-  }, [editRevision, level, levelProgress, orderedTests]);
+  }, [editRevision, level, levelProgress, updateProgress]);
 
   useEffect(() => {
     if (
@@ -336,37 +311,24 @@ function App() {
   };
 
   const setAutoTest = (autoTest: boolean) => {
-    setProgress((current) =>
-      current
-        ? {
-            ...current,
-            settings: { ...current.settings, autoTest },
-          }
-        : current,
-    );
+    updateProgress((current) => ({
+      ...current,
+      settings: { ...current.settings, autoTest },
+    }));
   };
 
   const selectLevel = (selected: Level | undefined) => {
-    if (!progress || !selected) return;
-    setProgress({
-      ...progress,
+    if (!selected) return;
+    updateProgress((current) => ({
+      ...current,
       currentExerciseKey: selected.key,
       trackExerciseKeys: {
-        ...progress.trackExerciseKeys,
+        ...current.trackExerciseKeys,
         [selected.track]: selected.key,
       },
-    });
+    }));
     setEditRevision(0);
     lastAutoRevisionRef.current = 0;
-  };
-
-  const switchTrack = (track: AssessmentTrack) => {
-    if (!progress || track === activeTrack) return;
-    const rememberedKey = progress.trackExerciseKeys[track];
-    const selected =
-      levels.find((item) => item.key === rememberedKey && item.track === track) ??
-      levels.find((item) => item.track === track);
-    selectLevel(selected);
   };
 
   const resetCode = () => {
@@ -531,22 +493,7 @@ function App() {
           <span>imperative</span>
           <strong>/ go</strong>
         </div>
-        <nav className="track-switch" aria-label="Assessment track">
-          <button
-            className={activeTrack === "core" ? "active" : ""}
-            aria-pressed={activeTrack === "core"}
-            onClick={() => switchTrack("core")}
-          >
-            Core <span>{trackCounts.core}</span>
-          </button>
-          <button
-            className={activeTrack === "advanced" ? "active" : ""}
-            aria-pressed={activeTrack === "advanced"}
-            onClick={() => switchTrack("advanced")}
-          >
-            Advanced <span>{trackCounts.advanced}</span>
-          </button>
-        </nav>
+        <div className="checkpoint-label">checkpoint · 17 exercises</div>
         <div className="level-stepper">
           <button
             onClick={() => selectLevel(trackLevels[trackIndex - 1])}
@@ -706,7 +653,7 @@ function App() {
             >
               <Console
                 result={result}
-                tests={orderedTests}
+                tests={level.tests}
                 running={running}
                 testsVisible={testsVisible}
                 onShowTests={() => setTestsVisible(true)}
@@ -721,8 +668,8 @@ function App() {
                     onReset={() => resetPane("tests")}
                   />
                   <ExerciseTests
-                    tests={orderedTests}
-                    onMove={moveTest}
+                    tests={level.tests}
+                    result={result}
                     onHide={() => setTestsVisible(false)}
                   />
                 </>
@@ -778,7 +725,6 @@ function ResizeHandle({
 }
 
 function ExerciseBrief({ level, passed }: { level: Level; passed: boolean }) {
-  const instructions = level.instructions;
   return (
     <aside className="brief">
       <div className="brief-heading">
@@ -788,70 +734,16 @@ function ExerciseBrief({ level, passed }: { level: Level; passed: boolean }) {
         <code>{level.signature}</code>
       </div>
 
-      <BriefSection title="Instructions">
-        <p className="objective">{instructions.objective}</p>
-        <p className="task-lead">Your solution must:</p>
-        <ul className="instruction-list">
-          <li>
-            <strong>Accept:</strong> {instructions.input}
-          </li>
-          <li>
-            <strong>Output:</strong> {instructions.output}
-          </li>
-          {instructions.constraints.map((rule) => (
-            <li key={rule}>{rule}</li>
-          ))}
-        </ul>
-        <p className="starter-note">{instructions.starterNote}</p>
-      </BriefSection>
-
-      <BriefSection title="Examples">
-        <div className="examples">
-          {instructions.examples.map((example) => (
-            <div key={`${example.input}-${example.output}`}>
-              <code>{example.input}</code>
-              <span>→</span>
-              <code>{example.output}</code>
-            </div>
-          ))}
-        </div>
-      </BriefSection>
-
-      <BriefSection title="Allowed">
-        <p className="allowed-label">Built-ins</p>
-        <code className="token-list">
-          {instructions.allowedBuiltins.join(" · ")}
-        </code>
-        <p className="allowed-label">Packages</p>
-        <code className="token-list">
-          {instructions.allowedPackages.join(" · ")}
-        </code>
-        <p className="restriction">
-          Everything not listed above is blocked for this exercise.
-        </p>
-        <p className="allowed-label">Avoid</p>
-        <ul className="pitfall-list">
-          {instructions.commonPitfalls.map((pitfall) => (
-            <li key={pitfall}>{pitfall}</li>
-          ))}
-        </ul>
-      </BriefSection>
+      <section className="subject-markdown">
+        <Markdown>{level.subject}</Markdown>
+        {(level.resources ?? []).map((resource) => (
+          <details className="exercise-resource" key={resource.name}>
+            <summary>Provided resource · {resource.name}</summary>
+            <pre><code>{resource.content}</code></pre>
+          </details>
+        ))}
+      </section>
     </aside>
-  );
-}
-
-function BriefSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="brief-section">
-      <h2>{title}</h2>
-      <div>{children}</div>
-    </section>
   );
 }
 
@@ -947,142 +839,13 @@ function Console({
 
 function ExerciseTests({
   tests,
-  onMove,
+  result,
   onHide,
 }: {
   tests: Level["tests"];
-  onMove: (movingID: string, targetID: string) => void;
+  result?: RunResult;
   onHide: () => void;
 }) {
-  const [draggingID, setDraggingID] = useState<string | null>(null);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const draggingIDRef = useRef<string | null>(null);
-  const dragOffsetRef = useRef({ x: 0, y: 0 });
-  const pointerRef = useRef({ x: 0, y: 0 });
-  const dragStartXRef = useRef(0);
-  const grabOffsetYRef = useRef(0);
-
-  const resetDragging = useCallback(() => {
-    draggingIDRef.current = null;
-    dragOffsetRef.current = { x: 0, y: 0 };
-    setDragOffset({ x: 0, y: 0 });
-    setDraggingID(null);
-  }, []);
-
-  useEffect(() => {
-    if (!draggingID) return;
-    const stop = () => resetDragging();
-    window.addEventListener("pointerup", stop);
-    window.addEventListener("pointercancel", stop);
-    window.addEventListener("blur", stop);
-    return () => {
-      window.removeEventListener("pointerup", stop);
-      window.removeEventListener("pointercancel", stop);
-      window.removeEventListener("blur", stop);
-    };
-  }, [draggingID, resetDragging]);
-
-  useLayoutEffect(() => {
-    if (!draggingID) return;
-    const card = document.querySelector<HTMLElement>(
-      `[data-test-id="${draggingID}"]`,
-    );
-    const list = card?.closest(".exercise-test-list");
-    if (!card || !list) return;
-
-    const cardBounds = card.getBoundingClientRect();
-    const desiredTop = draggedCardTop(
-      list,
-      card,
-      draggingID,
-      pointerRef.current.y,
-      grabOffsetYRef.current,
-    );
-    const correction = desiredTop - cardBounds.top;
-    if (Math.abs(correction) < 0.5) return;
-
-    const next = {
-      ...dragOffsetRef.current,
-      y: Math.round(dragOffsetRef.current.y + correction),
-    };
-    dragOffsetRef.current = next;
-    setDragOffset(next);
-  }, [draggingID, tests]);
-
-  const startDragging = (
-    event: ReactPointerEvent<HTMLButtonElement>,
-    testID: string,
-  ) => {
-    if (event.button !== 0) return;
-    event.preventDefault();
-    const card = event.currentTarget.closest(".exercise-test");
-    const list = event.currentTarget.closest(".exercise-test-list");
-    if (!card || !list) return;
-    const bounds = card.getBoundingClientRect();
-    pointerRef.current = { x: event.clientX, y: event.clientY };
-    dragStartXRef.current = event.clientX;
-    grabOffsetYRef.current = event.clientY - bounds.top;
-    dragOffsetRef.current = { x: 0, y: 0 };
-    setDragOffset({ x: 0, y: 0 });
-    draggingIDRef.current = testID;
-    setDraggingID(testID);
-    list.setPointerCapture(event.pointerId);
-  };
-
-  const moveDraggedTest = (
-    event: ReactPointerEvent<HTMLDivElement>,
-  ) => {
-    const movingID = draggingIDRef.current;
-    if (!movingID) return;
-    event.preventDefault();
-    pointerRef.current = { x: event.clientX, y: event.clientY };
-
-    const list = event.currentTarget;
-    const target = Array.from(
-      list.querySelectorAll<HTMLElement>("[data-test-id]"),
-    ).find((element) => {
-      if (element.dataset.testId === movingID) return false;
-      const bounds = element.getBoundingClientRect();
-      return event.clientY >= bounds.top && event.clientY <= bounds.bottom;
-    });
-    const targetID = target?.dataset.testId;
-    if (targetID && targetID !== movingID) onMove(movingID, targetID);
-
-    const card = document.querySelector<HTMLElement>(
-      `[data-test-id="${movingID}"]`,
-    );
-    if (!card) return;
-    const listBounds = list.getBoundingClientRect();
-    const cardBounds = card.getBoundingClientRect();
-    const desiredTop = draggedCardTop(
-      list,
-      card,
-      movingID,
-      event.clientY,
-      grabOffsetYRef.current,
-    );
-    const next = {
-      x: Math.round(clamp(event.clientX - dragStartXRef.current, -18, 18)),
-      y: Math.round(
-        dragOffsetRef.current.y + desiredTop - cardBounds.top,
-      ),
-    };
-    dragOffsetRef.current = next;
-    setDragOffset(next);
-
-    if (event.clientY < listBounds.top + 32) list.scrollBy({ top: -16 });
-    if (event.clientY > listBounds.bottom - 32) list.scrollBy({ top: 16 });
-  };
-
-  const stopDragging = (
-    event: ReactPointerEvent<HTMLDivElement>,
-  ) => {
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-    resetDragging();
-  };
-
   return (
     <section className="exercise-tests">
       <h2>
@@ -1093,104 +856,53 @@ function ExerciseTests({
           <EyeOff /> Hide
         </button>
       </h2>
-      <div
-        className={`exercise-test-list${draggingID ? " dragging-test" : ""}`}
-        onLostPointerCapture={resetDragging}
-        onPointerCancel={stopDragging}
-        onPointerMove={moveDraggedTest}
-        onPointerUp={stopDragging}
-      >
-        {tests.map((test, index) => (
-          <article
-            className={`exercise-test${draggingID === test.id ? " dragging" : ""}`}
-            data-test-id={test.id}
-            key={test.id}
-            style={
-              draggingID === test.id
-                ? ({
-                    "--drag-x": `${dragOffset.x}px`,
-                    "--drag-y": `${dragOffset.y}px`,
-                  } as React.CSSProperties)
-                : undefined
-            }
-          >
-            <div className="test-title">
-              <button
-                aria-label={`Drag ${test.name} to reorder`}
-                className="test-drag-handle"
-                onPointerDown={(event) => startDragging(event, test.id)}
-                title="Drag to change execution order"
-                type="button"
-              >
-                <GripVertical aria-hidden="true" />
-              </button>
-              <span>#{index + 1}</span>
-              <strong>{test.name}</strong>
-              <div className="test-order-controls">
-                <button
-                  aria-label={`Move ${test.name} earlier`}
-                  disabled={index === 0}
-                  onClick={() => onMove(test.id, tests[index - 1].id)}
-                  title="Run this test earlier"
+      <div className="exercise-test-list">
+        {tests.map((test, index) => {
+          const testResult = result?.results.find((item) => item.id === test.id);
+          const status = displayTestStatus(result, testResult);
+          const label = displayTestStatusLabel(status);
+          const ariaLabel =
+            status === "pass"
+              ? "Test passed"
+              : status === "fail"
+                ? "Test failed"
+                : status === "not_run"
+                  ? "Test not run"
+                  : status === "error"
+                    ? "Test error"
+                    : "Test pending";
+          return (
+            <article className="exercise-test" key={test.id}>
+              <div className="test-title">
+                <span>#{index + 1}</span>
+                <strong>{test.name}</strong>
+                <span
+                  className={`test-result test-result-${status}`}
+                  aria-label={ariaLabel}
                 >
-                  <ArrowUp />
-                </button>
-                <button
-                  aria-label={`Move ${test.name} later`}
-                  disabled={index === tests.length - 1}
-                  onClick={() => onMove(test.id, tests[index + 1].id)}
-                  title="Run this test later"
-                >
-                  <ArrowDown />
-                </button>
+                  {label}
+                </span>
               </div>
-            </div>
-            <p>{test.purpose}</p>
-            <dl>
-              <div>
-                <dt>Input</dt>
-                <dd>
-                  <code>{test.input}</code>
-                </dd>
-              </div>
-              <div>
-                <dt>Need</dt>
-                <dd>
-                  <code>{test.expected}</code>
-                </dd>
-              </div>
-            </dl>
-          </article>
-        ))}
+              <p>{test.purpose}</p>
+              <dl>
+                <div>
+                  <dt>Input</dt>
+                  <dd>
+                    <code>{test.input}</code>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Need</dt>
+                  <dd>
+                    <code>{test.expected}</code>
+                  </dd>
+                </div>
+              </dl>
+            </article>
+          );
+        })}
       </div>
     </section>
-  );
-}
-
-function draggedCardTop(
-  list: Element,
-  card: HTMLElement,
-  movingID: string,
-  pointerY: number,
-  grabOffsetY: number,
-): number {
-  const cards = Array.from(
-    list.querySelectorAll<HTMLElement>("[data-test-id]"),
-  );
-  const index = cards.findIndex(
-    (candidate) => candidate.dataset.testId === movingID,
-  );
-  const previousCardBottom =
-    index === cards.length - 1 && index > 0
-      ? cards[index - 1].getBoundingClientRect().bottom
-      : undefined;
-  const viewport = list.getBoundingClientRect();
-  return constrainDragTop(
-    pointerY - grabOffsetY,
-    viewport.top,
-    viewport.bottom,
-    card.offsetHeight,
-    previousCardBottom,
   );
 }
 

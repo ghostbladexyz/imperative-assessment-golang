@@ -48,6 +48,11 @@ export interface VisibleTest {
   expected: string;
 }
 
+export interface ExerciseResource {
+  name: string;
+  content: string;
+}
+
 export interface Level {
   key: ExerciseKey;
   id: number;
@@ -59,6 +64,8 @@ export interface Level {
   stretch: boolean;
   signature: string;
   starterCode: string;
+  subject: string;
+  resources: ExerciseResource[];
   instructions: Instructions;
   tests: VisibleTest[];
 }
@@ -66,10 +73,6 @@ export interface Level {
 export interface Catalogue {
   levels: Level[];
   progressSchemaVersion: number;
-  legacyProgress: {
-    schemaVersion: 4;
-    exerciseKeys: ExerciseKey[];
-  };
 }
 
 export type ResultStatus =
@@ -77,6 +80,7 @@ export type ResultStatus =
   | "pass"
   | "assertion"
   | "compile"
+  | "not_run"
   | "runtime";
 
 export interface TestResult extends VisibleTest {

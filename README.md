@@ -1,25 +1,23 @@
-# Imperative Go Practice Assessment
+# Imperative Checkpoint Practice Assessment
 
-A local, browser-based practice assessment with 189 Go exercises, automatic
-tests, console feedback, and saved progress. Its independently selectable Core
-and Advanced tracks let learners enter the 18 advanced capstones without first
-completing the 171 foundational and checkpoint exercises. Every advanced
-subject—parsing and data handling, error handling, HTTP, algorithms,
-concurrency, and SQL—contains at least three exercises. Submitted code runs in
-a restricted Docker container by default.
+A local, browser-based practice assessment with the 17 Imperative Checkpoint
+exercises, automatic tests, console feedback, and saved progress. The exercises
+are arranged from easiest to hardest, and submitted code is checked by the
+pinned official Zone01 grader in a restricted Docker container.
 
 This is an unofficial practice tool and is not affiliated with Zone01.
-Exercises after the 21-level foundation adapt the public
-[Go checkpoint catalogue](https://github.com/software-sappho/.go-checkpoints-solutions/tree/main)
-and [Zone01 piscine catalogue](https://github.com/kinoz01/zone01-Piscine).
-Duplicate and alternate-solution files are omitted, and the canonical
-[01-edu subjects](https://github.com/01-edu/public/tree/master/subjects) define
-the contracts and examples.
+The exercise subjects, starter programs, and supplied resources are copied
+verbatim from the
+[Zone01 Athens local tester](https://github.com/LeKoutz/zone01-checkpoint-imperative-local-tester).
 
 ## Requirements
 
 - Go 1.23 or newer
 - Docker Desktop or Docker Engine with a running Linux-container daemon
+
+The pinned grader image targets `linux/amd64`. On ARM64 hosts, Docker must
+provide amd64 emulation; otherwise the application reports that emulation must
+be enabled before a run can start.
 
 That is everything needed to run the application. The compiled frontend is
 included in the repository, so students do not need Node.js or npm.
@@ -30,40 +28,30 @@ included in the repository, so students do not need Node.js or npm.
 go run ./cmd/server -open
 ```
 
-The first run builds the pinned sandbox image, starts the server, and opens
-[http://127.0.0.1:8080](http://127.0.0.1:8080). Later runs reuse the image while
-its inputs remain unchanged. Keep the terminal open while using the app, and
-press `Ctrl+C` there to stop it.
+The first run downloads the digest-pinned official grader image, starts the
+server, and opens [http://127.0.0.1:8080](http://127.0.0.1:8080). Later runs
+reuse that exact image. Keep the terminal open while using the app, and press
+`Ctrl+C` there to stop it.
 
 At startup, the application checks GitHub for newer commits and prints the
 appropriate `git pull` command when an update is available. The check has a
 short timeout, is cached for one hour, and never prevents startup. Disable it
 with `-check-updates=false`.
 
-Docker mode gives each submission a disposable container with no network,
-a read-only root filesystem, dropped capabilities, resource limits, and no host
-directory mounts. It is intended for local and classroom use; do not expose the
-server as a public code-execution service. See [SECURITY.md](SECURITY.md) for the
-full trust model.
-
-## Optional local runner
-
-If Docker is unavailable, trusted code can run directly on the host:
-
-```sh
-go run ./cmd/server -runner local -open
-```
-
-The local runner executes submissions with your operating-system permissions.
-It keeps the same execution and output limits but is not a sandbox.
+Each submission receives a disposable container with no network, a read-only
+root filesystem, resource limits, and read-only bind mounts for the submitted
+`main.go` and any exercise-supplied resources. The official entrypoint drops
+privileges before executing learner code. This remains intended for local and
+classroom use; do not expose
+the server as a public code-execution service. See [SECURITY.md](SECURITY.md).
 
 ## Using the assessment
 
-- Work through the exercises in order; passing every visible test unlocks the
+- Work through the exercises in order; passing every official check unlocks the
   next exercise.
 - Use **Test** for feedback, **gofmt** to format the code, and **.go** to download
   the current editor contents.
-- Drag tests or use their arrow buttons to choose the order in which they run.
+- Tests are shown in the fixed order used by the official grader.
   Program output from `z01.PrintRune` or `fmt.Print*` appears in the console.
 - Progress and editor layout are saved in the browser on the current device.
 - Drag the panel dividers to resize the instructions, editor, tests, and console.
@@ -88,21 +76,19 @@ Common targets:
 
 | Target | Purpose |
 | --- | --- |
-| `make run` | Start with the Docker sandbox |
-| `make run-local` | Start with the trusted local runner |
+| `make run` | Start with the digest-pinned official Docker grader |
 | `make check` | Run Go and frontend verification |
 | `make frontend-dev` | Start the Vite development server |
 | `make frontend-build` | Rebuild the embedded frontend |
 | `make test` | Run the Go test suite |
-| `make docker-build` | Build the sandbox image directly |
 | `make docker-test` | Run the opt-in Docker integration suite |
 
 For live frontend development, run `make run` and `make frontend-dev` in
 separate terminals, then open
 [http://127.0.0.1:5173](http://127.0.0.1:5173).
 
-The GitHub Actions workflow runs Go formatting, vetting and tests, frontend
-linting, tests and build, and a Docker image build on every pull request.
+The GitHub Actions workflow runs Go formatting, vetting and tests plus frontend
+linting, tests, and build on every pull request.
 
 ## License
 

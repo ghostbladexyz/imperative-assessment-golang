@@ -31,12 +31,11 @@ export async function fetchRunnerConfig(): Promise<RunnerConfig> {
 export async function runTests(
   exerciseKey: ExerciseKey,
   code: string,
-  testIds: string[],
   signal: AbortSignal,
 ): Promise<RunResult> {
   return request<RunResult>("/api/run", {
     method: "POST",
-    body: JSON.stringify({ exerciseKey, code, testIds }),
+    body: JSON.stringify({ exerciseKey, code }),
     signal,
   });
 }

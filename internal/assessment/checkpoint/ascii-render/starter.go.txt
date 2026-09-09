@@ -1,0 +1,33 @@
+package main
+
+import (
+	"fmt"
+	"os"
+	"strings"
+)
+
+func render(input string, banner []string) string {
+	var out []string
+	for _, segment := range strings.Split(input, "\\n") {
+		if segment == "" {
+			out = append(out, "")
+			continue
+		}
+
+		for row := 0; row < 8; row++ {
+			var line strings.Builder
+			// TODO: append this row of each character's glyph to line.
+			out = append(out, line.String())
+		}
+	}
+
+	return strings.Join(out, "\n") + "\n"
+}
+
+func main() {
+	bannerBytes, _ := os.ReadFile(os.Args[1])
+	inputBytes, _ := os.ReadFile(os.Args[2])
+	banner := strings.Split(string(bannerBytes), "\n")
+	input := strings.TrimRight(string(inputBytes), "\n")
+	fmt.Fprint(os.Stdout, render(input, banner))
+}

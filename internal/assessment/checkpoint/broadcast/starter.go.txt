@@ -1,0 +1,61 @@
+// PROVIDED: listener, handshake, and message loop. Complete two TODO regions.
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"net"
+	"os"
+	"strings"
+	"sync"
+)
+
+var (
+	mu      sync.Mutex
+	clients = map[net.Conn]string{}
+)
+
+func broadcast(sender net.Conn, name, msg string) {
+	// TODO: implement broadcast.
+}
+
+func handle(conn net.Conn) {
+	defer conn.Close()
+	r := bufio.NewReader(conn)
+	name, err := r.ReadString('\n')
+	if err != nil {
+		return
+	}
+	name = strings.TrimSpace(name)
+
+	// TODO: implement the registry lifecycle for this connection.
+
+	for {
+		line, err := r.ReadString('\n')
+		if err != nil {
+			return
+		}
+		if msg := strings.TrimSpace(line); msg != "" {
+			broadcast(conn, name, msg)
+		}
+	}
+}
+
+func main() {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8974"
+	}
+	ln, err := net.Listen("tcp", "127.0.0.1:"+port)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	for {
+		conn, err := ln.Accept()
+		if err != nil {
+			continue
+		}
+		go handle(conn)
+	}
+}

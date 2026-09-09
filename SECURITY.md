@@ -2,7 +2,7 @@
 
 ## Supported use
 
-Imperative Go Practice Assessment is intended for local development and supervised classroom use. The default Docker runner materially improves isolation over direct local execution, but the project is not a hardened anonymous public code-execution service.
+Imperative Checkpoint Practice Assessment is intended for local development and supervised classroom use. Its Docker runner materially improves isolation, but the project is not a hardened anonymous public code-execution service.
 
 Security fixes are applied to the latest version on the default branch.
 
@@ -22,23 +22,25 @@ Do not include real credentials, private keys, or unrelated personal data in a r
 
 The server binds to `127.0.0.1` by default and selects the runner at startup. Browser requests cannot change that selection.
 
-In Docker mode, each submission receives a new non-root container with no network or shared IPC, a read-only root filesystem, dropped capabilities, `no-new-privileges`, resource limits, bounded tmpfs mounts, no host bind mounts, and no Docker log persistence. The submitted source and server-generated harness travel through a bounded JSON request on standard input. Docker cannot pull an image while handling a submission. The exact container is force-removed after every outcome, and a later startup removes any labeled non-running container left by an abrupt host-process exit.
+Each submission receives a new container with no network or shared IPC, a read-only root filesystem, resource limits, a bounded tmpfs, and no Docker log persistence. The temporary submitted `main.go` and declared exercise resources are bind-mounted read-only. The pinned official entrypoint compiles them and then uses `setpriv` to execute learner code as UID/GID 65534 with cleared supplementary groups and `no-new-privileges`. The container is force-removed after every outcome, and startup removes labeled non-running containers left by an abrupt host-process exit.
+
+The outer container starts as root because the official entrypoint needs to compile and then perform that privilege transition. Applying Docker's blanket capability drop or outer `no-new-privileges` prevents the pinned grader from switching users. This is a deliberate compatibility trade-off, not a claim of hardened multi-tenant isolation.
 
 The following remain trusted:
 
 - The Docker daemon and Docker Desktop or Engine installation
 - Docker's VM, host kernel, container runtime, and configuration
-- The assessment server process and its server-owned harness
+- The digest-pinned official grader image, including its tests and compiled oracles
+- The assessment server process and result parser
 - The local receipt signing key
 
-The scratch-based runner image deliberately contains only a pinned Go toolchain, fixed entrypoint, and precompiled standard-library cache. Its allowlisted build context excludes the assessment catalogue and other repository data. It must not contain assessment solutions, host credentials, receipt keys, the Docker CLI, or the Docker socket.
+The official image reference includes an immutable SHA-256 digest. It contains the grader implementation and compiled oracles by design, but receives no host credentials, receipt keys, Docker CLI, or Docker socket.
 
 ## Known limitations
 
 - A container escape or Docker/runtime vulnerability may compromise the host boundary.
 - Resource limits reduce denial-of-service risk but do not eliminate all host pressure or runtime bugs.
 - The Docker daemon is privileged infrastructure; anyone who can control it is outside this threat model.
-- Local runner mode executes submitted code with the current user's permissions and provides no OS isolation.
 - Binding beyond localhost or forwarding the port expands exposure and is unsupported.
 - This design does not provide multi-tenant identity, authentication, quotas, abuse detection, or workload separation.
 
@@ -52,4 +54,4 @@ Keep Docker Desktop or Engine and the host OS patched. Review base-image digest 
 docker ps -a --filter name=imperative-go-assessment- --format "{{.Names}} {{.Status}}"
 ```
 
-Remove only exact project image tags when cleaning the cache. Do not use broad prune commands as part of this application's normal operation.
+Remove only the exact digest-pinned grader reference when cleaning the cache. Do not use broad prune commands as part of this application's normal operation.

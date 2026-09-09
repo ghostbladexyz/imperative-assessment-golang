@@ -20,6 +20,9 @@ var goBuiltins = map[string]struct{}{
 // ValidateSourcePolicy rejects imports and Go built-in calls outside the
 // exercise's explicit allowlist before untrusted code reaches a compiler.
 func ValidateSourcePolicy(level Level, source string) error {
+	if level.unrestricted {
+		return nil
+	}
 	fileSet := token.NewFileSet()
 	file, err := parser.ParseFile(fileSet, "solution.go", source, 0)
 	if err != nil {

@@ -1,0 +1,140 @@
+package main
+
+import (
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+)
+
+// PROVIDED: token model and tokenizer.
+
+type Kind int
+
+const (
+	Word      Kind = iota // a normal word (Text holds it)
+	Punct                 // a punctuation run glued to the previous word (Text holds it)
+	Directive             // a "(hex)" / "(bin)" instruction (Name holds it)
+)
+
+// Token is one element of the tokenized line.
+type Token struct {
+	Kind Kind
+	Text string // Word / Punct literal
+	Name string // Directive name: "hex" | "bin"
+}
+
+const punct = ".,!?:;"
+const vowels = "aeiouAEIOU"
+
+func isPunct(t string) bool { return t != "" && strings.Trim(t, punct) == "" }
+
+func isDirectiveName(s string) bool {
+	switch s {
+	case "hex", "bin":
+		return true
+	}
+	return false
+}
+
+// tokenize turns a raw line into a clean stream of typed tokens. "(hex)" / "(bin)"
+// become one Directive token; a bare punctuation run ("." "..." "!?") becomes one
+// Punct token; everything else is a Word.
+func tokenize(line string) []Token {
+	raw := strings.Split(line, " ")
+	var toks []Token
+	for i := 0; i < len(raw); i++ {
+		t := raw[i]
+		// single directive: "(hex)" / "(bin)"
+		if len(t) >= 2 && t[0] == '(' && t[len(t)-1] == ')' && isDirectiveName(t[1:len(t)-1]) {
+			toks = append(toks, Token{Kind: Directive, Name: t[1 : len(t)-1]})
+			continue
+		}
+		if isPunct(t) {
+			toks = append(toks, Token{Kind: Punct, Text: t})
+			continue
+		}
+		toks = append(toks, Token{Kind: Word, Text: t})
+	}
+	return toks
+}
+
+// PROVIDED: helpers used by resolve.
+
+// lastWordIdx returns the most recent Word position, skipping Punct, or -1.
+func lastWordIdx(out []Token) int {
+	for j := len(out) - 1; j >= 0; j-- {
+		if out[j].Kind == Word {
+			return j
+		}
+	}
+	return -1
+}
+
+// wordPositions returns every Word position in order, skipping Punct.
+func wordPositions(out []Token) []int {
+	var wp []int
+	for j, t := range out {
+		if t.Kind == Word {
+			wp = append(wp, j)
+		}
+	}
+	return wp
+}
+
+// PROVIDED: output assembly.
+
+// assemble joins the resolved tokens: one space between words, punctuation glued
+// to the previous word, empty words dropped.
+func assemble(out []Token) string {
+	var b strings.Builder
+	for _, t := range out {
+		if t.Kind == Word && t.Text == "" {
+			continue
+		}
+		switch {
+		case t.Kind == Punct:
+			b.WriteString(t.Text)
+		case b.Len() == 0:
+			b.WriteString(t.Text)
+		default:
+			b.WriteString(" " + t.Text)
+		}
+	}
+	return b.String()
+}
+
+// Complete the two marked regions inside resolve; the traversal is provided.
+func resolve(toks []Token) []Token {
+	var out []Token
+	for _, t := range toks {
+		switch t.Kind {
+		case Word, Punct:
+			out = append(out, t)
+		case Directive:
+			// TODO A: convert the previous real word for this directive when valid.
+			_ = strconv.IntSize // keep the provided import available until this region is complete
+		}
+	}
+
+	// TODO B: apply the article rule using the next real word.
+
+	return out
+}
+
+func transformLine(line string) string {
+	return assemble(resolve(tokenize(line)))
+}
+
+func main() {
+	data, err := os.ReadFile(os.Args[1])
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	lines := strings.Split(string(data), "\n")
+	for i, ln := range lines {
+		lines[i] = transformLine(ln)
+	}
+	fmt.Fprint(os.Stdout, strings.Join(lines, "\n"))
+}

@@ -3,9 +3,7 @@ package runner
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"os/exec"
-	"strings"
 	"sync"
 )
 
@@ -40,10 +38,6 @@ func (buffer *limitedBuffer) String() string {
 	return buffer.buffer.String()
 }
 
-func runCommand(parent context.Context, limit int, name string, args ...string) (string, string, error, bool) {
-	return runCommandInput(parent, limit, nil, name, args...)
-}
-
 func runCommandInput(parent context.Context, limit int, stdin []byte, name string, args ...string) (string, string, error, bool) {
 	ctx, cancel := context.WithCancel(parent)
 	defer cancel()
@@ -57,52 +51,4 @@ func runCommandInput(parent context.Context, limit int, stdin []byte, name strin
 	command.Stderr = stderr
 	err := command.Run()
 	return stdout.String(), stderr.String(), err, stdout.limited || stderr.limited
-}
-
-func parseResults(stdout string) []wireResult {
-	var results []wireResult
-	var pendingOutput []string
-	for _, line := range strings.Split(strings.ReplaceAll(stdout, "\r\n", "\n"), "\n") {
-		prefix, payload, found := splitResultLine(line, "__IMPERATIVE_ASSESSMENT_RESULT__")
-		if !found {
-			pendingOutput = append(pendingOutput, line)
-			continue
-		}
-		if prefix != "" {
-			pendingOutput = append(pendingOutput, prefix)
-		}
-		var result wireResult
-		if json.Unmarshal([]byte(payload), &result) == nil {
-			result.Stdout = strings.TrimSpace(strings.Join(pendingOutput, "\n"))
-			results = append(results, result)
-			pendingOutput = nil
-		}
-	}
-	return results
-}
-
-func stripMarkers(stdout string) string {
-	lines := strings.Split(strings.ReplaceAll(stdout, "\r\n", "\n"), "\n")
-	kept := lines[:0]
-	for _, line := range lines {
-		prefix, _, found := splitResultLine(line, "__IMPERATIVE_ASSESSMENT_RESULT__")
-		if found {
-			kept = append(kept, prefix)
-		} else {
-			kept = append(kept, line)
-		}
-	}
-	return strings.TrimSpace(strings.Join(kept, "\n"))
-}
-
-func splitResultLine(line, marker string) (string, string, bool) {
-	index := strings.Index(line, marker)
-	if index < 0 {
-		return "", "", false
-	}
-	payload := line[index+len(marker):]
-	if !json.Valid([]byte(payload)) {
-		return "", "", false
-	}
-	return line[:index], payload, true
 }

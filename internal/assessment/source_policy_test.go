@@ -7,7 +7,7 @@ import (
 
 func TestSourcePolicyAcceptsDocumentedBuiltinsAndPackages(t *testing.T) {
 	t.Parallel()
-	level := mustFindExercise(t, "zone01/50")
+	level := restrictedLevel([]string{"append"}, []string{"fmt"})
 	source := `package main
 
 import "fmt"
@@ -26,7 +26,7 @@ func ConcatSlice(left, right []int) []int {
 
 func TestSourcePolicyRejectsUnlistedBuiltin(t *testing.T) {
 	t.Parallel()
-	level := mustFindExercise(t, "zone01/50")
+	level := restrictedLevel([]string{"append"}, []string{"fmt"})
 	source := `package main
 func ConcatSlice(left, right []int) []int {
 	values := []int{}
@@ -41,7 +41,7 @@ func ConcatSlice(left, right []int) []int {
 
 func TestSourcePolicyRejectsAliasedUnlistedBuiltin(t *testing.T) {
 	t.Parallel()
-	level := mustFindExercise(t, "zone01/50")
+	level := restrictedLevel([]string{"append"}, []string{"fmt"})
 	source := `package main
 func ConcatSlice(left, right []int) []int {
 	forbidden := copy
@@ -57,7 +57,7 @@ func ConcatSlice(left, right []int) []int {
 
 func TestSourcePolicyRejectsUnlistedPackage(t *testing.T) {
 	t.Parallel()
-	level := mustFindExercise(t, "zone01/50")
+	level := restrictedLevel([]string{"append"}, []string{"fmt"})
 	source := `package main
 import "regexp"
 func ConcatSlice(left, right []int) []int {
@@ -72,7 +72,7 @@ func ConcatSlice(left, right []int) []int {
 
 func TestPrintedOutputPolicyRequiresZ01(t *testing.T) {
 	t.Parallel()
-	level := mustFindExercise(t, "piscine/1014")
+	level := restrictedLevel(nil, []string{"github.com/01-edu/z01"})
 	z01Source := `package main
 import "github.com/01-edu/z01"
 func PrintComb() { z01.PrintRune('0') }`
@@ -89,11 +89,6 @@ func PrintComb() { fmt.Print("0") }`
 	}
 }
 
-func mustFindExercise(t *testing.T, key ExerciseKey) Level {
-	t.Helper()
-	level, found := FindExercise(key)
-	if !found {
-		t.Fatalf("missing exercise %q", key)
-	}
-	return level
+func restrictedLevel(builtins, packages []string) Level {
+	return Level{Instructions: Instructions{AllowedBuiltins: builtins, AllowedPackages: packages}}
 }

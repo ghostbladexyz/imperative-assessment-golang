@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   verify:
-    name: Go, web, and Docker
+    name: Go and web
     runs-on: ubuntu-24.04
     timeout-minutes: 20
 
@@ -62,6 +62,3 @@ jobs:
       - name: Build frontend
         working-directory: web
         run: npm run build
-
-      - name: Build pinned Docker runner image
-        run: docker build --file docker/runner.Dockerfile --tag imperative-go-assessment-runner:ci .

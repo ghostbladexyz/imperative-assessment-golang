@@ -1,0 +1,36 @@
+// PROVIDED: form, mux, and listener. Complete only the two handlers.
+package main
+
+import (
+	"fmt"
+	"net/http"
+	"os"
+	"strings"
+)
+
+const form = `<html><body><form method="post" action="/generate">` +
+	`<input name="text"><button>go</button></form></body></html>`
+
+func rootHandler(w http.ResponseWriter, r *http.Request) {
+	// TODO: implement rootHandler.
+	_ = form
+}
+func generateHandler(w http.ResponseWriter, r *http.Request) {
+	_ = strings.ToUpper
+	// TODO: implement generateHandler.
+}
+
+func main() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", rootHandler)
+	mux.HandleFunc("/generate", generateHandler)
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	if err := http.ListenAndServe("127.0.0.1:"+port, mux); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}

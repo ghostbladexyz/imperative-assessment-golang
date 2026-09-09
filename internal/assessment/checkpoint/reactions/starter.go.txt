@@ -1,0 +1,63 @@
+package main
+
+import (
+	"database/sql"
+	"fmt"
+	"os"
+	"strconv"
+
+	_ "modernc.org/sqlite" // provided driver — already wired
+)
+
+// PROVIDED: CLI/database driver. Complete only setReaction and count.
+
+func main() {
+	if len(os.Args) < 3 {
+		fmt.Fprintln(os.Stderr, "usage: prog <db> <like|dislike|count> ...")
+		os.Exit(2)
+	}
+	db, err := sql.Open("sqlite", os.Args[1])
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	defer db.Close()
+
+	switch os.Args[2] {
+	case "like", "dislike":
+		user, post := atoi(os.Args[3]), atoi(os.Args[4])
+		if err := setReaction(db, user, post, os.Args[2]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	case "count":
+		post := atoi(os.Args[3])
+		likes, dislikes, err := count(db, post)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Printf("likes=%d dislikes=%d\n", likes, dislikes) // exact output format — do not change
+	default:
+		fmt.Fprintf(os.Stderr, "unknown command %s\n", os.Args[2])
+		os.Exit(2)
+	}
+}
+
+func atoi(s string) int {
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "invalid numeric argument %q\n", s)
+		os.Exit(2)
+	}
+	return n
+}
+
+func setReaction(db *sql.DB, user, post int, value string) error {
+	// TODO: implement setReaction.
+	panic("TODO: setReaction")
+}
+func count(db *sql.DB, post int) (likes, dislikes int, err error) {
+	// TODO: implement count.
+	panic("TODO: count")
+}

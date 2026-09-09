@@ -1,0 +1,24 @@
+package main
+
+import (
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+)
+
+func sumLine(line string) string {
+	_ = strconv.ParseInt
+	// TODO: implement sumLine.
+	return ""
+}
+
+func main() {
+	data, _ := os.ReadFile(os.Args[1]) // the input file is guaranteed to exist and be readable
+	lines := strings.Split(string(data), "\n")
+	out := make([]string, len(lines))
+	for i, ln := range lines {
+		out[i] = sumLine(ln)
+	}
+	fmt.Fprint(os.Stdout, strings.Join(out, "\n")) // byte-exact: no trailing newline
+}

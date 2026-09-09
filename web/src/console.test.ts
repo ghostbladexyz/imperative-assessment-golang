@@ -21,7 +21,7 @@ const tests: Level["tests"] = [
 
 function run(overrides: Partial<RunResult>): RunResult {
   return {
-    exerciseKey: "foundation/1",
+    exerciseKey: "checkpoint/validate-stack",
     levelId: 1,
     passed: false,
     passedCount: 0,
@@ -86,7 +86,7 @@ describe("buildConsoleStreams", () => {
       { label: "output", value: "hello", error: false },
       {
         label: "test #1 failed: Empty input",
-        value: 'Need: ["hi"], Actual: []',
+		value: 'Input: ""\nNeed: ["hi"]\nGot: []',
         error: true,
       },
     ]);
@@ -120,7 +120,53 @@ describe("buildConsoleStreams", () => {
     expect(streams).toEqual([
       {
         label: "test #1 failed: Empty input",
-        value: 'Need: ["hi"], Actual: false',
+		value: 'Input: ""\nNeed: ["hi"]\nGot: false',
+        error: true,
+      },
+    ]);
+  });
+
+  it("does not report a grader-stopped test as failed", () => {
+    const streams = buildConsoleStreams(
+      run({
+        totalCount: 2,
+        results: [
+          {
+            ...tests[0],
+            actual: "[]",
+            passed: true,
+            status: "pass",
+            durationMs: 0,
+          },
+          {
+            ...tests[1],
+            actual: "",
+            passed: false,
+            status: "not_run",
+            failure: "The official grader stopped after an earlier failure.",
+            durationMs: 0,
+          },
+        ],
+      }),
+      tests,
+    );
+
+    expect(streams).toEqual([
+      {
+        label: "test #2 not run: One byte",
+        value: "The official grader stopped after an earlier failure.",
+        error: false,
+      },
+    ]);
+  });
+
+  it("reports a missing grader result as an error", () => {
+    const streams = buildConsoleStreams(run({ totalCount: 2 }), tests);
+
+    expect(streams).toEqual([
+      {
+        label: "test #1 error: Empty input",
+        value: "Error: The official grader did not return a result for this check.",
         error: true,
       },
     ]);

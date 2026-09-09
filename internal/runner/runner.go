@@ -26,7 +26,6 @@ type Mode string
 
 const (
 	ModeDocker Mode = "docker"
-	ModeLocal  Mode = "local"
 )
 
 const (
@@ -96,7 +95,7 @@ type Info struct {
 }
 
 type Service interface {
-	Run(context.Context, assessment.Level, string, []string) RunResult
+	Run(context.Context, assessment.Level, string) RunResult
 	Format(context.Context, string) (string, error)
 	Info() Info
 }
@@ -109,19 +108,19 @@ type executionPlan struct {
 	level      assessment.Level
 	tests      []assessment.VisibleTest
 	prepared   string
-	harness    string
 	sourceHash string
 }
 
 type executionOutcome struct {
-	status          executionStatus
-	compileError    string
-	runtimeError    string
-	failureKind     string
-	stdout          string
-	stderr          string
-	formattedSource string
-	results         []wireResult
+	status              executionStatus
+	compileError        string
+	runtimeError        string
+	failureKind         string
+	stdout              string
+	stderr              string
+	formattedSource     string
+	results             []wireResult
+	stoppedAfterFailure bool
 }
 
 type executionAdapter interface {
@@ -154,9 +153,9 @@ func (engine *Engine) Format(_ context.Context, source string) (string, error) {
 	return FormatSource(source)
 }
 
-func (engine *Engine) Run(ctx context.Context, level assessment.Level, source string, testIDs []string) RunResult {
+func (engine *Engine) Run(ctx context.Context, level assessment.Level, source string) RunResult {
 	started := time.Now()
-	result, plan, valid := prepareRun(level, source, testIDs, started)
+	result, plan, valid := prepareRun(level, source, started)
 	if !valid || !engine.acquire(ctx, &result, started) {
 		return result
 	}
@@ -167,7 +166,6 @@ func (engine *Engine) Run(ctx context.Context, level assessment.Level, source st
 		plan,
 		outcome,
 		result,
-		len(plan.tests) == len(level.Tests),
 		started,
 	)
 }
@@ -196,7 +194,6 @@ func (engine *Engine) complete(
 	plan executionPlan,
 	outcome executionOutcome,
 	result RunResult,
-	wholeSuite bool,
 	started time.Time,
 ) RunResult {
 	result.Stdout = outcome.stdout
@@ -204,7 +201,7 @@ func (engine *Engine) complete(
 	result.CompileError = outcome.compileError
 	result.RuntimeError = outcome.runtimeError
 	result.FailureKind = outcome.failureKind
-	applyWireResults(&result, outcome.results)
+	applyWireResults(&result, outcome.results, outcome.stoppedAfterFailure)
 	if stdout, found := selectedTestStdout(result.Results, outcome.results); found {
 		result.Stdout = stdout
 	}
@@ -253,7 +250,6 @@ func (engine *Engine) complete(
 	}
 
 	result.Passed = outcome.status == executionSuccess &&
-		wholeSuite &&
 		result.PassedCount == len(plan.level.Tests) &&
 		result.CompileError == "" &&
 		result.RuntimeError == "" &&
@@ -289,21 +285,15 @@ func sourceHash(prepared string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func prepareRun(level assessment.Level, source string, testIDs []string, started time.Time) (RunResult, executionPlan, bool) {
+func prepareRun(level assessment.Level, source string, started time.Time) (RunResult, executionPlan, bool) {
 	result := RunResult{ExerciseKey: level.Key, LevelID: level.ID}
 	if len(source) > MaxSourceBytes {
 		result.CompileError = fmt.Sprintf("Source is too large. The limit is %d KiB.", MaxSourceBytes/1024)
 		result.DurationMS = elapsedMS(started)
 		return result, executionPlan{}, false
 	}
-	selected, valid := assessment.SelectTests(level, testIDs)
-	if !valid {
-		result.CompileError = "The request contains an unknown test identifier."
-		result.DurationMS = elapsedMS(started)
-		return result, executionPlan{}, false
-	}
-	result.TotalCount = len(selected)
-	for _, current := range selected {
+	result.TotalCount = len(level.Tests)
+	for _, current := range level.Tests {
 		result.Results = append(result.Results, TestResult{
 			ID: current.ID, Name: current.Name, Purpose: current.Purpose,
 			Input: current.Input, Expected: current.Expected, Status: "pending",
@@ -319,14 +309,13 @@ func prepareRun(level assessment.Level, source string, testIDs []string, started
 	}
 	return result, executionPlan{
 		level:      level,
-		tests:      selected,
+		tests:      level.Tests,
 		prepared:   prepared,
-		harness:    level.BuildHarness(selected),
 		sourceHash: result.SourceHash,
 	}, true
 }
 
-func applyWireResults(result *RunResult, items []wireResult) {
+func applyWireResults(result *RunResult, items []wireResult, stoppedAfterFailure bool) {
 	byID := make(map[string]wireResult, len(items))
 	for _, item := range items {
 		byID[item.ID] = item
@@ -334,18 +323,30 @@ func applyWireResults(result *RunResult, items []wireResult) {
 	for index := range result.Results {
 		wire, found := byID[result.Results[index].ID]
 		if !found {
-			result.Results[index].Status = "runtime"
-			result.Results[index].Failure = "The program stopped before this test produced a result."
+			if stoppedAfterFailure {
+				result.Results[index].Status = "not_run"
+				result.Results[index].Failure = "The official grader stopped after an earlier failure."
+			} else {
+				result.Results[index].Status = "runtime"
+				result.Results[index].Failure = "The program stopped before this test produced a result."
+			}
 			continue
 		}
 		result.Results[index].Actual = wire.Actual
+		if wire.Input != "" {
+			result.Results[index].Input = wire.Input
+		}
 		result.Results[index].DurationMS = wire.DurationMS
 		result.Results[index].Failure = wire.Failure
 		if wire.Failure != "" {
-			result.Results[index].Status = "runtime"
+			if wire.Actual != "" {
+				result.Results[index].Status = "assertion"
+			} else {
+				result.Results[index].Status = "runtime"
+			}
 			continue
 		}
-		if wire.Actual == result.Results[index].Expected {
+		if wire.Actual == "pass" {
 			result.Results[index].Passed = true
 			result.Results[index].Status = "pass"
 			result.PassedCount++
@@ -357,6 +358,7 @@ func applyWireResults(result *RunResult, items []wireResult) {
 
 type wireResult struct {
 	ID         string  `json:"id"`
+	Input      string  `json:"input,omitempty"`
 	Actual     string  `json:"actual"`
 	Failure    string  `json:"failure"`
 	Stdout     string  `json:"stdout,omitempty"`
@@ -375,7 +377,7 @@ func selectedTestStdout(results []TestResult, wires []wireResult) (string, bool)
 		}
 	}
 	for _, wire := range wires {
-		if wire.ID == selectedID {
+		if wire.ID == selectedID && wire.Stdout != "" {
 			return wire.Stdout, true
 		}
 	}
@@ -395,8 +397,6 @@ func cleanCompilerError(message string) string {
 	for index, line := range lines {
 		if marker := strings.Index(line, "/solution.go:"); marker >= 0 {
 			lines[index] = "solution.go:" + line[marker+len("/solution.go:"):]
-		} else if marker := strings.Index(line, "/assessment_harness.go:"); marker >= 0 {
-			lines[index] = "assessment tests:" + line[marker+len("/assessment_harness.go:"):]
 		}
 	}
 	cleaned := strings.Join(lines, "\n")
