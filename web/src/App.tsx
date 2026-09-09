@@ -1,4 +1,6 @@
 import {
+  Children,
+  isValidElement,
   type PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
@@ -33,6 +35,7 @@ import {
   validateReceipts,
 } from "./api";
 import { buildConsoleStreams } from "./console";
+import { isMermaidSource, MermaidDiagram } from "./MermaidDiagram";
 import { loadProgress, saveProgress } from "./storage";
 import {
   displayTestStatus,
@@ -735,7 +738,31 @@ function ExerciseBrief({ level, passed }: { level: Level; passed: boolean }) {
       </div>
 
       <section className="subject-markdown">
-        <Markdown>{level.subject}</Markdown>
+        <Markdown
+          components={{
+            code({ className, children, ...props }) {
+              const language = /language-(\w+)/.exec(className ?? "")?.[1];
+              const source = String(children).replace(/\n$/, "");
+              if (language === "mermaid" || isMermaidSource(source)) {
+                return <MermaidDiagram source={source} />;
+              }
+              return (
+                <code className={className} {...props}>
+                  {children}
+                </code>
+              );
+            },
+            pre({ children, ...props }) {
+              const child = Children.toArray(children)[0];
+              if (isValidElement(child) && child.type === MermaidDiagram) {
+                return child;
+              }
+              return <pre {...props}>{children}</pre>;
+            },
+          }}
+        >
+          {level.subject}
+        </Markdown>
         {(level.resources ?? []).map((resource) => (
           <details className="exercise-resource" key={resource.name}>
             <summary>Provided resource · {resource.name}</summary>
