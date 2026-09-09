@@ -517,9 +517,15 @@ function App() {
         };
       }
       if (kind === "tests") {
+        const layoutWidth =
+          layoutRef.current?.getBoundingClientRect().width ?? window.innerWidth;
         return {
           ...current,
-          tests: Math.max(TESTS_MIN_WIDTH, current.tests + delta),
+          tests: clamp(
+            current.tests + delta,
+            TESTS_MIN_WIDTH,
+            maxTestsWidth(layoutWidth),
+          ),
         };
       }
       return {
@@ -1066,7 +1072,7 @@ function loadPaneSizes(): PaneSizes {
               BRIEF_MIN_WIDTH,
               typeof window === "undefined"
                 ? BRIEF_MAX_WIDTH
-                : maxBriefWidth(window.innerWidth, tests, testsVisible),
+                : maxSavedBriefWidth(window.innerWidth, tests, testsVisible),
             )
           : defaultBriefWidth(testsVisible),
       output:
@@ -1098,7 +1104,7 @@ function defaultBriefWidth(testsVisible = true): number {
   return clamp(
     window.innerWidth * DEFAULT_BRIEF_RATIO,
     BRIEF_MIN_WIDTH,
-    maxBriefWidth(window.innerWidth, DEFAULT_TESTS_WIDTH, testsVisible),
+    maxSavedBriefWidth(window.innerWidth, DEFAULT_TESTS_WIDTH, testsVisible),
   );
 }
 
@@ -1128,6 +1134,16 @@ function maxBriefWidth(
         LAYOUT_HANDLE_WIDTH,
     ),
   );
+}
+
+function maxSavedBriefWidth(
+  viewportWidth: number,
+  testsWidth: number,
+  testsVisible: boolean,
+): number {
+  return viewportWidth <= 1100
+    ? BRIEF_MAX_WIDTH
+    : maxBriefWidth(viewportWidth, testsWidth, testsVisible);
 }
 
 function maxTestsWidth(layoutWidth: number): number {
