@@ -14,8 +14,10 @@ pinned official Zone01 grader in a restricted Docker container.
 
 This is an unofficial practice tool and is not affiliated with Zone01.
 The exercise subjects, starter programs, and supplied resources are copied
-verbatim from the
+from the pinned
 [Zone01 Athens local tester](https://github.com/LeKoutz/zone01-checkpoint-imperative-local-tester).
+The exercise README flowchart fences add a first-party `mermaid` annotation
+for the embedded frontend; all other exercise content remains unchanged.
 
 ## Requirements
 

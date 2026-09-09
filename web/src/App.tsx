@@ -823,10 +823,10 @@ function ExerciseBrief({ level, passed }: { level: Level; passed: boolean }) {
               const language = /language-(\w+)/.exec(className ?? "")?.[1];
               const rawSource = String(children);
               const source = rawSource.replace(/\n$/, "");
-              const isBlock = Boolean(className) || rawSource.endsWith("\n");
+              const isUnlabeledBlock = !className && rawSource.endsWith("\n");
               if (
                 language === "mermaid" ||
-                (isBlock && isMermaidSource(source))
+                (isUnlabeledBlock && isMermaidSource(source))
               ) {
                 return <MermaidDiagram source={source} />;
               }
