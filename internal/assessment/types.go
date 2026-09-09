@@ -101,7 +101,3 @@ func FindExercise(key ExerciseKey) (Level, bool) {
 func LegacyExerciseKey(position int) (ExerciseKey, bool) {
 	return catalogueLegacyKey(position)
 }
-
-func LegacyExerciseKeys() []ExerciseKey {
-	return catalogueLegacyKeys()
-}

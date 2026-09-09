@@ -73,10 +73,6 @@ export interface Level {
 export interface Catalogue {
   levels: Level[];
   progressSchemaVersion: number;
-  legacyProgress: {
-    schemaVersion: 4;
-    exerciseKeys: ExerciseKey[];
-  };
 }
 
 export type ResultStatus =

@@ -26,7 +26,6 @@ const levels = slugs.map((slug, index) => ({
 const catalogue: Catalogue = {
   levels,
   progressSchemaVersion: 6,
-  legacyProgress: { schemaVersion: 4, exerciseKeys: [] },
 };
 
 function installLocalStorage(): () => void {
@@ -147,7 +146,25 @@ describe("progress state", () => {
     }
   });
 
-  it("rejects a foreign schema", () => {
-    expect(() => validateImport({ schemaVersion: 99 }, catalogue)).toThrow(/schema version 6 or 4/);
+  it("starts clean when saved progress uses an old schema", () => {
+    const restoreLocalStorage = installLocalStorage();
+    try {
+      localStorage.setItem(
+        "imperative-go-assessment:progress",
+        JSON.stringify({ schemaVersion: 5, currentExerciseKey: levels[2].key }),
+      );
+      const reloaded = loadProgress(catalogue);
+      expect(reloaded.schemaVersion).toBe(6);
+      expect(reloaded.currentExerciseKey).toBe(levels[0].key);
+      expect(reloaded.exercises[levels[0].key].code).toBe(levels[0].starterCode);
+    } finally {
+      restoreLocalStorage();
+    }
+  });
+
+  it("rejects pre-checkpoint schemas in imports", () => {
+    for (const schemaVersion of [4, 5, 99]) {
+      expect(() => validateImport({ schemaVersion }, catalogue)).toThrow(/schema version 6/);
+    }
   });
 });

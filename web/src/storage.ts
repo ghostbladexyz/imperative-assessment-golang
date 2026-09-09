@@ -10,9 +10,7 @@ import type {
 } from "./types";
 
 export const STORAGE_KEY = "imperative-go-assessment:progress";
-export const LEGACY_STORAGE_KEY = "imperative-go-assessment:progress:v4";
 export const ASSESSMENT_SECONDS = 6 * 60 * 60;
-const Z01_PACKAGE = "github.com/01-edu/z01";
 
 export const defaultSettings = (): Settings => ({
   theme:
@@ -79,11 +77,8 @@ export function validateImport(
   if (value.schemaVersion === catalogue.progressSchemaVersion) {
     return reconcileCurrent(value, catalogue);
   }
-  if (value.schemaVersion === catalogue.legacyProgress.schemaVersion) {
-    return migrateLegacyProgress(value, catalogue);
-  }
   throw new Error(
-    `This backup does not use progress schema version ${catalogue.progressSchemaVersion} or ${catalogue.legacyProgress.schemaVersion}.`,
+    `This backup does not use progress schema version ${catalogue.progressSchemaVersion}.`,
   );
 }
 
@@ -110,39 +105,6 @@ function reconcileCurrent(
   );
   if (selected) clean.trackExerciseKeys[selected.track] = selected.key;
   reconcileExercises(clean, value.exercises, catalogue.levels, (level) => level.key);
-  reconcileSharedState(clean, value);
-  return clean;
-}
-
-function migrateLegacyProgress(
-  value: Record<string, unknown>,
-  catalogue: Catalogue,
-): SavedProgress {
-  if (!isRecord(value.levels) || !isRecord(value.timer) || !isRecord(value.settings)) {
-    throw new Error("The schema-v4 backup is missing required assessment fields.");
-  }
-  const clean = createProgress(catalogue);
-  const legacyPosition =
-    typeof value.currentLevelId === "number" &&
-    Number.isInteger(value.currentLevelId)
-      ? value.currentLevelId
-      : 1;
-  const requestedKey = catalogue.legacyProgress.exerciseKeys[legacyPosition - 1];
-  if (
-    requestedKey &&
-    catalogue.levels.some((level) => level.key === requestedKey)
-  ) {
-    clean.currentExerciseKey = requestedKey;
-    const selected = catalogue.levels.find((level) => level.key === requestedKey);
-    if (selected) clean.trackExerciseKeys[selected.track] = selected.key;
-  }
-  const legacyPositionByKey = new Map(
-    catalogue.legacyProgress.exerciseKeys.map((key, index) => [key, index + 1]),
-  );
-  reconcileExercises(clean, value.levels, catalogue.levels, (level) => {
-    const position = legacyPositionByKey.get(level.key);
-    return position === undefined ? undefined : String(position);
-  });
   reconcileSharedState(clean, value);
   return clean;
 }
@@ -240,25 +202,7 @@ function reconcileExerciseCode(
       ? level.starterCode
       : savedCode;
   }
-  return isLegacyGeneratedPrintStarter(savedCode, level)
-    ? level.starterCode
-    : savedCode;
-}
-
-// isLegacyGeneratedPrintStarter recognizes only the old untouched template so migrated progress never discards authored code.
-function isLegacyGeneratedPrintStarter(code: string, level: Level): boolean {
-  if (!level.instructions.allowedPackages?.includes(Z01_PACKAGE)) return false;
-  const openingParenthesis = level.signature.indexOf("(");
-  if (openingParenthesis < 1) return false;
-  const functionName = level.signature.slice(0, openingParenthesis).trim();
-  const escapedName = functionName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const oldTemplate = new RegExp(
-    `^(?:package\\s+main\\s+)?func\\s+${escapedName}\\s*` +
-      `\\([^{}\\n]*\\)\\s+[^{}\\n]+\\{\\s*` +
-      `//\\s*TODO:\\s*implement the checkpoint behavior\\.\\s*` +
-      `return\\s+(?:""|0|nil|false)\\s*\\}$`,
-  );
-  return oldTemplate.test(code.replace(/\r\n/g, "\n").trim());
+  return savedCode;
 }
 
 function reconcileSharedState(
@@ -297,13 +241,11 @@ function finiteNonNegative(value: unknown): number {
 }
 
 export function loadProgress(catalogue: Catalogue): SavedProgress {
-  for (const key of [STORAGE_KEY, LEGACY_STORAGE_KEY]) {
-    try {
-      const raw = localStorage.getItem(key);
-      if (raw) return validateImport(JSON.parse(raw), catalogue);
-    } catch {
-      // Try the older store before falling back to clean progress.
-    }
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return validateImport(JSON.parse(raw), catalogue);
+  } catch {
+    return createProgress(catalogue);
   }
   return createProgress(catalogue);
 }
@@ -313,7 +255,6 @@ export function saveProgress(progress: SavedProgress): void {
     STORAGE_KEY,
     JSON.stringify({ ...progress, updatedAt: Date.now() }),
   );
-  localStorage.removeItem(LEGACY_STORAGE_KEY);
 }
 
 export function settleTimer(timer: TimerState, now = Date.now()): TimerState {

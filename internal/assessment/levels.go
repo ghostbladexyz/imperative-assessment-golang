@@ -92,8 +92,6 @@ func catalogueFindKey(key ExerciseKey) (Level, bool) {
 
 func catalogueLegacyKey(int) (ExerciseKey, bool) { return "", false }
 
-func catalogueLegacyKeys() []ExerciseKey { return []ExerciseKey{} }
-
 func cloneLevels(levels []Level) []Level {
 	cloned := make([]Level, len(levels))
 	for index, level := range levels {

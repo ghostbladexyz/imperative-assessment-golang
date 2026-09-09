@@ -224,10 +224,6 @@ func decodeOfficialOutcome(level assessment.Level, stdout, stderr string) (execu
 			break
 		}
 	}
-	if len(level.Tests) == 1 && len(outcome.results) == 0 && envelope.OK {
-		wire := wireResult{ID: level.Tests[0].ID, Actual: "pass"}
-		outcome.results = append(outcome.results, wire)
-	}
 	if len(outcome.results) == 0 {
 		return executionOutcome{}, errors.New("grader response contained no recognized checks")
 	}

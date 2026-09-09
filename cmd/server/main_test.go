@@ -106,7 +106,7 @@ func TestBrowserCannotSelectRunnerMode(t *testing.T) {
 	}
 }
 
-func TestCataloguePublishesProgressIdentityManifest(t *testing.T) {
+func TestCataloguePublishesCurrentProgressSchema(t *testing.T) {
 	handler, err := routes(&api{runner: &fakeRunner{}})
 	if err != nil {
 		t.Fatal(err)
@@ -119,17 +119,13 @@ func TestCataloguePublishesProgressIdentityManifest(t *testing.T) {
 	var body struct {
 		Levels                []assessment.Level `json:"levels"`
 		ProgressSchemaVersion int                `json:"progressSchemaVersion"`
-		LegacyProgress        struct {
-			SchemaVersion int                      `json:"schemaVersion"`
-			ExerciseKeys  []assessment.ExerciseKey `json:"exerciseKeys"`
-		} `json:"legacyProgress"`
+		LegacyProgress        json.RawMessage    `json:"legacyProgress"`
 	}
 	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
 	if body.ProgressSchemaVersion != progressSchemaVersion ||
-		body.LegacyProgress.SchemaVersion != 4 ||
-		len(body.LegacyProgress.ExerciseKeys) != 0 ||
+		body.LegacyProgress != nil ||
 		len(body.Levels) != 17 ||
 		body.Levels[0].Key != "checkpoint/validate-stack" ||
 		body.Levels[len(body.Levels)-1].Key != "checkpoint/reactions" {

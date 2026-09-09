@@ -166,10 +166,6 @@ func routes(api *api) (http.Handler, error) {
 		writeJSON(writer, http.StatusOK, map[string]any{
 			"levels":                assessment.PublicLevels(),
 			"progressSchemaVersion": progressSchemaVersion,
-			"legacyProgress": map[string]any{
-				"schemaVersion": 4,
-				"exerciseKeys":  assessment.LegacyExerciseKeys(),
-			},
 		})
 	})
 	mux.HandleFunc("POST /api/run", api.run)
