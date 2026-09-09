@@ -34,6 +34,18 @@ func TestDecodeOfficialOutcomeMapsAggregateFailure(t *testing.T) {
 	}
 }
 
+func TestDecodeOfficialOutcomeRejectsMissingSingleAggregateResult(t *testing.T) {
+	level := mustExercise(t, "checkpoint/push-swap")
+	raw := "Exercise: push-swap\nRESULT: FAIL\n{\"Ok\":false,\"Output\":\"details\"}\n"
+	outcome, err := decodeOfficialOutcome(level, raw, "")
+	if err == nil {
+		t.Fatal("missing aggregate result was accepted")
+	}
+	if len(outcome.results) != 0 {
+		t.Fatalf("missing aggregate result fabricated checks: %#v", outcome.results)
+	}
+}
+
 func TestDecodeOfficialOutcomeRejectsFailedAggregate(t *testing.T) {
 	level := mustExercise(t, "checkpoint/validate-stack")
 	raw := "Exercise: validate-stack\nRESULT: PASS\n  PASS tp4/distinct_ok [accepted]\n{\"Ok\":false,\"Output\":\"details\"}\n"
