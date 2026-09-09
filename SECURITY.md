@@ -2,7 +2,7 @@
 
 ## Supported use
 
-Imperative Go Practice Assessment is intended for local development and supervised classroom use. Its Docker runner materially improves isolation, but the project is not a hardened anonymous public code-execution service.
+Imperative Checkpoint Practice Assessment is intended for local development and supervised classroom use. Its Docker runner materially improves isolation, but the project is not a hardened anonymous public code-execution service.
 
 Security fixes are applied to the latest version on the default branch.
 

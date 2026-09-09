@@ -1,4 +1,4 @@
-# Contributing to Imperative Go Practice Assessment
+# Contributing to Imperative Checkpoint Practice Assessment
 
 Thank you for helping improve the assessment. Contributions may include exercise corrections, runner and sandbox improvements, frontend changes, tests, and documentation.
 
