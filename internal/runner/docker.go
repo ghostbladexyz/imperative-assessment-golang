@@ -345,6 +345,9 @@ func stageOfficialResources(directory, exerciseKey string, resources []assessmen
 		if err := os.WriteFile(sourcePath, []byte(resource.Content), 0o644); err != nil {
 			return nil, err
 		}
+		if err := os.Chmod(sourcePath, 0o644); err != nil {
+			return nil, err
+		}
 		mounts = append(mounts, dockerResourceMount{
 			sourcePath: sourcePath,
 			targetPath: targetDirectory + "/" + resource.Name,
@@ -363,6 +366,7 @@ func dockerRunArgs(name, exerciseKey, sourcePath string, resourceMounts []docker
 		"--ulimit", "nofile=256:256", "--ulimit", "core=0:0",
 		"--tmpfs", "/tmp:rw,exec,nosuid,nodev,size=256m,mode=1777",
 		"--env", "EXERCISE=" + slug, "--env", "FILE=" + slug + "/main.go", "--env", "EMIT_JSON=1",
+		"--env", "GOCACHE=/tmp/go-build",
 	}
 	args = append(args, "--mount", "type=bind,source="+sourcePath+",target="+target+",readonly")
 	for _, resource := range resourceMounts {

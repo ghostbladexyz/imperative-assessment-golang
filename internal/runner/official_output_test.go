@@ -2,8 +2,11 @@ package runner
 
 import (
 	"context"
+	"os"
 	"strings"
 	"testing"
+
+	"github.com/pleft/imperative-assessment-golang/internal/assessment"
 )
 
 func TestDecodeOfficialOutcomeMapsPassesAndFailures(t *testing.T) {
@@ -132,6 +135,38 @@ func TestDockerRunUsesPinnedAMD64Platform(t *testing.T) {
 		return
 	}
 	t.Fatal("Docker run did not specify a platform")
+}
+
+func TestDockerRunUsesWritableGoCache(t *testing.T) {
+	args := dockerRunArgs("imperative-go-assessment-0123456789abcdef01234567", "checkpoint/validate-stack", `C:\tmp\main.go`, nil)
+	for index, argument := range args {
+		if argument != "--env" {
+			continue
+		}
+		if index+1 < len(args) && args[index+1] == "GOCACHE=/tmp/go-build" {
+			return
+		}
+	}
+	t.Fatal("Docker run did not override GOCACHE with a writable tmpfs path")
+}
+
+func TestStageOfficialResourcesAreReadableByLearner(t *testing.T) {
+	mounts, err := stageOfficialResources(t.TempDir(), "checkpoint/ascii-render", []assessment.ExerciseResource{{
+		Name: "banner.txt", Content: "banner",
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(mounts) != 1 {
+		t.Fatalf("staged %d resources, want 1", len(mounts))
+	}
+	info, err := os.Stat(mounts[0].sourcePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm()&0o044 != 0o044 {
+		t.Fatalf("resource permissions = %o, want group and other read access", info.Mode().Perm())
+	}
 }
 
 func TestOfficialStartupMessageExplainsMissingAMD64Emulation(t *testing.T) {
