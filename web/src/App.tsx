@@ -56,12 +56,14 @@ const TESTS_VISIBILITY_KEY = "imperative-go-assessment:tests-visible:v1";
 const DEFAULT_BRIEF_RATIO = 0.54;
 const BRIEF_MIN_WIDTH = 320;
 const BRIEF_MAX_WIDTH = 760;
-const OUTPUT_GRID_MIN_WIDTH = 767;
+const DEFAULT_TESTS_WIDTH = 480;
+const CONSOLE_MIN_WIDTH = 280;
+const TESTS_MIN_WIDTH = 280;
 const LAYOUT_HANDLE_WIDTH = 7;
 const DEFAULT_PANE_SIZES: PaneSizes = {
   brief: defaultBriefWidth(),
   output: 250,
-  tests: 480,
+  tests: DEFAULT_TESTS_WIDTH,
 };
 
 function App() {
@@ -75,6 +77,7 @@ function App() {
   const [fullscreen, setFullscreen] = useState(false);
   const [paneSizes, setPaneSizes] = useState(loadPaneSizes);
   const [testsVisible, setTestsVisible] = useState(loadTestsVisibility);
+  const [testsAutoHidden, setTestsAutoHidden] = useState(false);
   const progressRef = useRef<SavedProgress | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
   const runVersionRef = useRef(0);
@@ -82,6 +85,7 @@ function App() {
   const layoutRef = useRef<HTMLDivElement>(null);
   const workspaceRef = useRef<HTMLElement>(null);
   const outputGridRef = useRef<HTMLDivElement>(null);
+  const testsPanelVisible = testsVisible && !testsAutoHidden;
 
   if (progress) progressRef.current = progress;
 
@@ -168,6 +172,39 @@ function App() {
   useEffect(() => {
     localStorage.setItem(TESTS_VISIBILITY_KEY, String(testsVisible));
   }, [testsVisible]);
+
+  useEffect(() => {
+    if (!testsVisible) {
+      setTestsAutoHidden(false);
+      return;
+    }
+
+    const updateTestsAvailability = () => {
+      const layoutWidth = layoutRef.current?.getBoundingClientRect().width;
+      if (!layoutWidth) return;
+      if (window.matchMedia("(max-width: 620px)").matches) {
+        setTestsAutoHidden(false);
+        return;
+      }
+      const outputMinimum = outputGridMinWidth(paneSizes.tests, true);
+      const layoutMinimum = window.matchMedia("(max-width: 1100px)").matches
+        ? outputMinimum
+        : BRIEF_MIN_WIDTH + LAYOUT_HANDLE_WIDTH + outputMinimum;
+      setTestsAutoHidden(layoutWidth < layoutMinimum);
+    };
+
+    updateTestsAvailability();
+    window.addEventListener("resize", updateTestsAvailability);
+    const observer =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(updateTestsAvailability);
+    if (layoutRef.current) observer?.observe(layoutRef.current);
+    return () => {
+      window.removeEventListener("resize", updateTestsAvailability);
+      observer?.disconnect();
+    };
+  }, [levels.length, paneSizes.tests, progress !== null, testsVisible]);
 
   const level = useMemo(
     () =>
@@ -418,7 +455,11 @@ function App() {
             brief: clamp(
               moveEvent.clientX - layoutRect.left,
               BRIEF_MIN_WIDTH,
-              maxBriefWidth(layoutRect.width),
+              maxBriefWidth(
+                layoutRect.width,
+                paneSizes.tests,
+                testsPanelVisible,
+              ),
             ),
           };
         }
@@ -437,8 +478,11 @@ function App() {
           ...current,
           tests: clamp(
             outputRect.right - moveEvent.clientX,
-            280,
-            Math.max(320, outputRect.width - 320),
+            TESTS_MIN_WIDTH,
+            Math.max(
+              TESTS_MIN_WIDTH,
+              outputRect.width - CONSOLE_MIN_WIDTH - LAYOUT_HANDLE_WIDTH,
+            ),
           ),
         };
       });
@@ -463,8 +507,20 @@ function App() {
           brief: clamp(
             current.brief + delta,
             BRIEF_MIN_WIDTH,
-            layoutWidth ? maxBriefWidth(layoutWidth) : BRIEF_MAX_WIDTH,
+            layoutWidth
+              ? maxBriefWidth(
+                  layoutWidth,
+                  current.tests,
+                  testsPanelVisible,
+                )
+              : BRIEF_MAX_WIDTH,
           ),
+        };
+      }
+      if (kind === "tests") {
+        return {
+          ...current,
+          tests: Math.max(TESTS_MIN_WIDTH, current.tests + delta),
         };
       }
       return {
@@ -548,6 +604,10 @@ function App() {
         style={
           {
             "--brief-width": `${paneSizes.brief}px`,
+            "--output-grid-min-width": `${outputGridMinWidth(
+              paneSizes.tests,
+              testsPanelVisible,
+            )}px`,
           } as React.CSSProperties
         }
       >
@@ -664,7 +724,7 @@ function App() {
             </div>
 
             <div
-              className={`output-grid${testsVisible ? "" : " tests-hidden"}`}
+              className={`output-grid${testsPanelVisible ? "" : " tests-hidden"}`}
               ref={outputGridRef}
               style={
                 {
@@ -676,10 +736,10 @@ function App() {
                 result={result}
                 tests={level.tests}
                 running={running}
-                testsVisible={testsVisible}
+                testsVisible={testsPanelVisible}
                 onShowTests={() => setTestsVisible(true)}
               />
-              {testsVisible ? (
+              {testsPanelVisible ? (
                 <>
                   <ResizeHandle
                     orientation="vertical"
@@ -1001,7 +1061,7 @@ function loadPaneSizes(): PaneSizes {
           : DEFAULT_PANE_SIZES.output,
       tests:
         typeof saved.tests === "number"
-          ? saved.tests
+          ? Math.max(TESTS_MIN_WIDTH, saved.tests)
           : DEFAULT_PANE_SIZES.tests,
     };
   } catch {
@@ -1014,16 +1074,34 @@ function defaultBriefWidth(): number {
   return clamp(
     window.innerWidth * DEFAULT_BRIEF_RATIO,
     BRIEF_MIN_WIDTH,
-    maxBriefWidth(window.innerWidth),
+    maxBriefWidth(window.innerWidth, DEFAULT_TESTS_WIDTH, true),
   );
 }
 
-function maxBriefWidth(layoutWidth: number): number {
+function outputGridMinWidth(
+  testsWidth: number,
+  testsVisible: boolean,
+): number {
+  if (!testsVisible) return CONSOLE_MIN_WIDTH;
+  return (
+    CONSOLE_MIN_WIDTH +
+    LAYOUT_HANDLE_WIDTH +
+    Math.max(TESTS_MIN_WIDTH, testsWidth)
+  );
+}
+
+function maxBriefWidth(
+  layoutWidth: number,
+  testsWidth: number,
+  testsVisible: boolean,
+): number {
   return Math.max(
     BRIEF_MIN_WIDTH,
     Math.min(
       BRIEF_MAX_WIDTH,
-      layoutWidth - OUTPUT_GRID_MIN_WIDTH - LAYOUT_HANDLE_WIDTH,
+      layoutWidth -
+        outputGridMinWidth(testsWidth, testsVisible) -
+        LAYOUT_HANDLE_WIDTH,
     ),
   );
 }

@@ -48,7 +48,11 @@ export function MermaidDiagram({ source }: MermaidDiagramProps) {
     let cancelled = false;
 
     const renderDiagram = async () => {
-      if (!containerRef.current) return;
+      const container = containerRef.current;
+      if (!container) return;
+
+      container.replaceChildren();
+      setError(null);
 
       try {
         const mermaid = await loadMermaid();

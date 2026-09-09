@@ -839,7 +839,7 @@ body.resizing-output {
 .output-grid {
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(280px, 1fr) 7px var(--tests-width, 480px);
+  grid-template-columns: minmax(280px, 1fr) 7px minmax(280px, var(--tests-width, 480px));
   overflow: hidden;
 }
 
