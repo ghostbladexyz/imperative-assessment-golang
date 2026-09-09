@@ -1,5 +1,12 @@
 # Imperative Checkpoint Practice Assessment
 
+[![CI](https://github.com/terry-xyz/imperative-assessment-golang/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/terry-xyz/imperative-assessment-golang/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/terry-xyz/imperative-assessment-golang?display_name=tag)](https://github.com/terry-xyz/imperative-assessment-golang/releases)
+[![License](https://img.shields.io/github/license/terry-xyz/imperative-assessment-golang)](https://github.com/terry-xyz/imperative-assessment-golang/blob/main/LICENSE)
+[![Go 1.23+](https://img.shields.io/badge/go-1.23%2B-00ADD8?logo=go&logoColor=white)](https://go.dev/doc/install)
+[![Go Report Card](https://goreportcard.com/badge/github.com/terry-xyz/imperative-assessment-golang)](https://goreportcard.com/report/github.com/terry-xyz/imperative-assessment-golang)
+[![Makefile](https://img.shields.io/badge/build-Makefile-427819?logo=gnu&logoColor=white)](https://github.com/terry-xyz/imperative-assessment-golang/blob/main/Makefile)
+
 A local, browser-based practice assessment with the 17 Imperative Checkpoint
 exercises, automatic tests, console feedback, and saved progress. The exercises
 are arranged from easiest to hardest, and submitted code is checked by the
