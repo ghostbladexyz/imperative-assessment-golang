@@ -229,6 +229,7 @@ func decodeOfficialOutcome(level assessment.Level, stdout, stderr string) (execu
 	}
 	if !envelope.OK {
 		outcome.status = executionRuntime
+		outcome.stoppedAfterFailure = hasFailedWireResult(outcome.results)
 		allPassed := true
 		for _, result := range outcome.results {
 			if result.Actual != "pass" || result.Failure != "" {
@@ -241,6 +242,15 @@ func decodeOfficialOutcome(level assessment.Level, stdout, stderr string) (execu
 		}
 	}
 	return outcome, nil
+}
+
+func hasFailedWireResult(results []wireResult) bool {
+	for _, result := range results {
+		if result.Actual != "pass" || result.Failure != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func compactOfficialOutput(output string) string {

@@ -82,6 +82,43 @@ func TestFailedAggregateCannotIssueReceipt(t *testing.T) {
 	}
 }
 
+func TestPartialOfficialOutcomeNeedsFailureEvidenceForNotRunChecks(t *testing.T) {
+	level := mustExercise(t, "checkpoint/validate-stack")
+	for _, test := range []struct {
+		name             string
+		raw              string
+		wantStoppedAfter bool
+		wantMissing      string
+	}{
+		{
+			name:             "passing envelope leaves missing checks in error",
+			raw:              "Exercise: validate-stack\nRESULT: PASS\n  PASS tp4/distinct_ok [accepted]\n{\"Ok\":true,\"Output\":\"details\"}\n",
+			wantStoppedAfter: false,
+			wantMissing:      "runtime",
+		},
+		{
+			name:             "failed envelope marks later checks not run",
+			raw:              "Exercise: validate-stack\nRESULT: FAIL\n  FAIL tp4/duplicate — wrong exit\n{\"Ok\":false,\"Output\":\"details\"}\n",
+			wantStoppedAfter: true,
+			wantMissing:      "not_run",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			outcome, err := decodeOfficialOutcome(level, test.raw, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if outcome.stoppedAfterFailure != test.wantStoppedAfter {
+				t.Fatalf("stoppedAfterFailure = %v, want %v", outcome.stoppedAfterFailure, test.wantStoppedAfter)
+			}
+			result := newEngine(&outcomeAdapter{outcome: outcome}, 1, nil).Run(context.Background(), level, level.StarterCode)
+			if result.Results[2].Status != test.wantMissing {
+				t.Fatalf("missing check status = %q, want %q: %#v", result.Results[2].Status, test.wantMissing, result.Results)
+			}
+		})
+	}
+}
+
 func TestDockerRunUsesOnlyExactSourceMountAndPinnedImage(t *testing.T) {
 	args := dockerRunArgs("imperative-go-assessment-0123456789abcdef01234567", "checkpoint/validate-stack", `C:\\tmp\\main.go`, nil)
 	joined := strings.Join(args, " ")

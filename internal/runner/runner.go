@@ -112,14 +112,15 @@ type executionPlan struct {
 }
 
 type executionOutcome struct {
-	status          executionStatus
-	compileError    string
-	runtimeError    string
-	failureKind     string
-	stdout          string
-	stderr          string
-	formattedSource string
-	results         []wireResult
+	status              executionStatus
+	compileError        string
+	runtimeError        string
+	failureKind         string
+	stdout              string
+	stderr              string
+	formattedSource     string
+	results             []wireResult
+	stoppedAfterFailure bool
 }
 
 type executionAdapter interface {
@@ -200,7 +201,7 @@ func (engine *Engine) complete(
 	result.CompileError = outcome.compileError
 	result.RuntimeError = outcome.runtimeError
 	result.FailureKind = outcome.failureKind
-	applyWireResults(&result, outcome.results)
+	applyWireResults(&result, outcome.results, outcome.stoppedAfterFailure)
 	if stdout, found := selectedTestStdout(result.Results, outcome.results); found {
 		result.Stdout = stdout
 	}
@@ -314,7 +315,7 @@ func prepareRun(level assessment.Level, source string, started time.Time) (RunRe
 	}, true
 }
 
-func applyWireResults(result *RunResult, items []wireResult) {
+func applyWireResults(result *RunResult, items []wireResult, stoppedAfterFailure bool) {
 	byID := make(map[string]wireResult, len(items))
 	for _, item := range items {
 		byID[item.ID] = item
@@ -322,7 +323,7 @@ func applyWireResults(result *RunResult, items []wireResult) {
 	for index := range result.Results {
 		wire, found := byID[result.Results[index].ID]
 		if !found {
-			if len(items) > 0 {
+			if stoppedAfterFailure {
 				result.Results[index].Status = "not_run"
 				result.Results[index].Failure = "The official grader stopped after an earlier failure."
 			} else {
