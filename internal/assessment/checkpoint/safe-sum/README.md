@@ -30,7 +30,7 @@ Examples for individual calls:
 - `sumLine("+7 -3")` returns `"4"`.
 - `sumLine("5 x 7")` returns `"error: invalid token \"x\""`.
 
-```
+```mermaid
 flowchart LR
     F["input-file path"] --> R["read + split lines · provided"]
     R -->|"line · string"| S["sumLine · TODO"]

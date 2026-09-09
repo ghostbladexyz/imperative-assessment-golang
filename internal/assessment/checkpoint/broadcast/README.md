@@ -16,7 +16,7 @@ Listener setup, the first-line name handshake, the message-read loop, and
 connection closing are provided. Client names and messages are newline-terminated;
 blank message lines are ignored by the driver.
 
-```
+```mermaid
 flowchart LR
     C["TCP connection"] --> H["name + message reads · provided"]
     H --> R["registry lifecycle in handle · TODO"]

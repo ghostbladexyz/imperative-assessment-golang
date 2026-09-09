@@ -20,7 +20,7 @@ added newline.
 The provided `ServeMux` registers `/` as a catch-all, so `rootHandler` also
 receives paths without a more specific route and must return `404` for them.
 
-```
+```mermaid
 flowchart LR
     Q["HTTP request"] --> M["ServeMux · provided"]
     M --> R["rootHandler · TODO"]

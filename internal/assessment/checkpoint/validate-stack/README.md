@@ -21,7 +21,7 @@ Sorting is not part of this exercise.
 
 ### How it fits
 
-```
+```mermaid
 flowchart LR
     Args["command-line arguments<br/>[]string"] --> Valid["valid (TODO)<br/>your only edit"]
     Valid -->|"bool"| Main["main (provided)"]

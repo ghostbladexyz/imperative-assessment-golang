@@ -4,14 +4,14 @@ type MermaidDiagramProps = {
   source: string;
 };
 
-const mermaidBlockStart = /^(?:flowchart|graph|sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram|journey|gantt|pie|gitGraph|mindmap|timeline|quadrantChart|xychart-beta|block-beta|sankey-beta|architecture-beta)\b/;
+const mermaidFlowchartStart = /^(?:flowchart|graph)\s+(?:TB|TD|BT|RL|LR)(?:\s|$)/;
 
 type Mermaid = typeof import("mermaid").default;
 
 let mermaidModule: Promise<Mermaid> | null = null;
 
 export function isMermaidSource(source: string): boolean {
-  return mermaidBlockStart.test(source.trim());
+  return mermaidFlowchartStart.test(source.trim());
 }
 
 function loadMermaid(): Promise<Mermaid> {

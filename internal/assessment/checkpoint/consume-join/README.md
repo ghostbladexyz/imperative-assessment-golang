@@ -24,7 +24,7 @@ errors are already returned by the provided `getJSON` helper.
 The required packages are pre-imported. Fetching/decoding and the final stdout or
 stderr reporting are provided.
 
-```
+```mermaid
 flowchart LR
     U["base URL + target"] --> F["fetch + decode · provided"]
     F -->|"artists, relations, locations"| R["join in run · TODO"]

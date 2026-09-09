@@ -54,6 +54,10 @@ type ResizeKind = keyof PaneSizes;
 const PANE_SIZE_KEY = "imperative-go-assessment:pane-sizes:v2";
 const TESTS_VISIBILITY_KEY = "imperative-go-assessment:tests-visible:v1";
 const DEFAULT_BRIEF_RATIO = 0.54;
+const BRIEF_MIN_WIDTH = 320;
+const BRIEF_MAX_WIDTH = 760;
+const OUTPUT_GRID_MIN_WIDTH = 767;
+const LAYOUT_HANDLE_WIDTH = 7;
 const DEFAULT_PANE_SIZES: PaneSizes = {
   brief: defaultBriefWidth(),
   output: 250,
@@ -398,7 +402,7 @@ function App() {
     kind: ResizeKind,
     event: ReactPointerEvent<HTMLDivElement>,
   ) => {
-    if (window.matchMedia("(max-width: 900px)").matches) return;
+    if (window.matchMedia("(max-width: 1100px)").matches) return;
     event.preventDefault();
     const layoutRect = layoutRef.current?.getBoundingClientRect();
     const workspaceRect = workspaceRef.current?.getBoundingClientRect();
@@ -413,8 +417,8 @@ function App() {
             ...current,
             brief: clamp(
               moveEvent.clientX - layoutRect.left,
-              320,
-              Math.max(360, Math.min(760, layoutRect.width - 440)),
+              BRIEF_MIN_WIDTH,
+              maxBriefWidth(layoutRect.width),
             ),
           };
         }
@@ -451,10 +455,23 @@ function App() {
   };
 
   const nudgePane = (kind: ResizeKind, delta: number) => {
-    setPaneSizes((current) => ({
-      ...current,
-      [kind]: Math.max(160, current[kind] + delta),
-    }));
+    setPaneSizes((current) => {
+      if (kind === "brief") {
+        const layoutWidth = layoutRef.current?.getBoundingClientRect().width;
+        return {
+          ...current,
+          brief: clamp(
+            current.brief + delta,
+            BRIEF_MIN_WIDTH,
+            layoutWidth ? maxBriefWidth(layoutWidth) : BRIEF_MAX_WIDTH,
+          ),
+        };
+      }
+      return {
+        ...current,
+        [kind]: Math.max(160, current[kind] + delta),
+      };
+    });
   };
 
   const resetPane = (kind: ResizeKind) => {
@@ -743,8 +760,13 @@ function ExerciseBrief({ level, passed }: { level: Level; passed: boolean }) {
           components={{
             code({ className, children, ...props }) {
               const language = /language-(\w+)/.exec(className ?? "")?.[1];
-              const source = String(children).replace(/\n$/, "");
-              if (language === "mermaid" || isMermaidSource(source)) {
+              const rawSource = String(children);
+              const source = rawSource.replace(/\n$/, "");
+              const isBlock = Boolean(className) || rawSource.endsWith("\n");
+              if (
+                language === "mermaid" ||
+                (isBlock && isMermaidSource(source))
+              ) {
                 return <MermaidDiagram source={source} />;
               }
               return (
@@ -989,7 +1011,21 @@ function loadPaneSizes(): PaneSizes {
 
 function defaultBriefWidth(): number {
   if (typeof window === "undefined") return 560;
-  return clamp(window.innerWidth * DEFAULT_BRIEF_RATIO, 420, 760);
+  return clamp(
+    window.innerWidth * DEFAULT_BRIEF_RATIO,
+    BRIEF_MIN_WIDTH,
+    maxBriefWidth(window.innerWidth),
+  );
+}
+
+function maxBriefWidth(layoutWidth: number): number {
+  return Math.max(
+    BRIEF_MIN_WIDTH,
+    Math.min(
+      BRIEF_MAX_WIDTH,
+      layoutWidth - OUTPUT_GRID_MIN_WIDTH - LAYOUT_HANDLE_WIDTH,
+    ),
+  );
 }
 
 function loadTestsVisibility(): boolean {

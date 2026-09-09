@@ -33,7 +33,7 @@ database opening, command dispatch and the exact count output are provided:
 likes=<L> dislikes=<D>
 ```
 
-```
+```mermaid
 flowchart LR
     A["CLI arguments"] --> D["dispatch · provided"]
     D --> S["setReaction · TODO"]

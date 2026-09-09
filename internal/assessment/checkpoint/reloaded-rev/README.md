@@ -27,7 +27,7 @@ append a newline that was not present in the input.
 
 ### How it fits
 
-```
+```mermaid
 flowchart LR
     File["input file path"] --> Read["read + split lines (provided)"]
     Read -->|"line string"| Tokenize["tokenize (provided)"]

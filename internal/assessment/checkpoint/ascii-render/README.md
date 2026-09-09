@@ -18,7 +18,7 @@ The complete rendered result ends with exactly one single final newline.
 
 ### How it fits
 
-```
+```mermaid
 flowchart LR
     Files["banner file + input file"] --> Load["load (provided)<br/>main reads files"]
     Load -->|"input string"| Split["split blocks (provided)<br/>inside render"]

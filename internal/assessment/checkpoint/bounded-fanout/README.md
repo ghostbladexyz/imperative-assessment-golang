@@ -17,7 +17,7 @@ goroutine running, including when `nums` is empty.
 The provided driver reads signed integers from the input-file path, calls
 `squareAll`, and prints one result per line without an added final newline.
 
-```
+```mermaid
 flowchart LR
     F["input file path"] --> P["read + parse · provided"]
     P -->|"[]int"| S["squareAll · TODO"]

@@ -20,7 +20,7 @@ panic. Other method combinations are not assessed.
 After the `400`, `404`, and `500` cases, another `GET /` must still return `200`.
 Error-response bodies are not graded.
 
-```
+```mermaid
 flowchart LR
     Q["HTTP request"] --> M["ServeMux · provided"]
     M --> R["rootHandler · TODO"]
