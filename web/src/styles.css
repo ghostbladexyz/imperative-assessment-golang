@@ -146,7 +146,7 @@ button:disabled {
 .practice-layout {
   min-height: 0;
   display: grid;
-  grid-template-columns: var(--brief-width, 340px) 7px minmax(0, 1fr);
+  grid-template-columns: var(--brief-width, 54vw) 7px minmax(0, 1fr);
   overflow: hidden;
   background: var(--bg);
 }

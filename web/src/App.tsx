@@ -51,10 +51,11 @@ type PaneSizes = {
 
 type ResizeKind = keyof PaneSizes;
 
-const PANE_SIZE_KEY = "imperative-go-assessment:pane-sizes:v1";
+const PANE_SIZE_KEY = "imperative-go-assessment:pane-sizes:v2";
 const TESTS_VISIBILITY_KEY = "imperative-go-assessment:tests-visible:v1";
+const DEFAULT_BRIEF_RATIO = 0.54;
 const DEFAULT_PANE_SIZES: PaneSizes = {
-  brief: 340,
+  brief: defaultBriefWidth(),
   output: 250,
   tests: 480,
 };
@@ -412,8 +413,8 @@ function App() {
             ...current,
             brief: clamp(
               moveEvent.clientX - layoutRect.left,
-              240,
-              Math.max(280, Math.min(560, layoutRect.width - 520)),
+              320,
+              Math.max(360, Math.min(760, layoutRect.width - 440)),
             ),
           };
         }
@@ -984,6 +985,11 @@ function loadPaneSizes(): PaneSizes {
   } catch {
     return DEFAULT_PANE_SIZES;
   }
+}
+
+function defaultBriefWidth(): number {
+  if (typeof window === "undefined") return 560;
+  return clamp(window.innerWidth * DEFAULT_BRIEF_RATIO, 420, 760);
 }
 
 function loadTestsVisibility(): boolean {
