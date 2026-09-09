@@ -37,14 +37,17 @@ func TestDecodeOfficialOutcomeMapsAggregateFailure(t *testing.T) {
 	}
 }
 
-func TestDecodeOfficialOutcomeRejectsMissingSingleAggregateResult(t *testing.T) {
+func TestDecodeOfficialOutcomePreservesMissingSingleAggregateResult(t *testing.T) {
 	level := mustExercise(t, "checkpoint/push-swap")
 	for _, envelope := range []string{"false", "true"} {
 		t.Run("Ok="+envelope, func(t *testing.T) {
 			raw := "Exercise: push-swap\nRESULT: FAIL\n{\"Ok\":" + envelope + ",\"Output\":\"details\"}\n"
 			outcome, err := decodeOfficialOutcome(level, raw, "")
-			if err == nil {
-				t.Fatal("missing aggregate result was accepted")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if outcome.status != executionRuntime || outcome.runtimeError == "" {
+				t.Fatalf("missing aggregate result was not preserved as an error: %#v", outcome)
 			}
 			if len(outcome.results) != 0 {
 				t.Fatalf("missing aggregate result fabricated checks: %#v", outcome.results)
@@ -189,6 +192,34 @@ func TestDockerRunUsesWritableGoCache(t *testing.T) {
 		}
 	}
 	t.Fatal("Docker run did not override GOCACHE with a writable tmpfs path")
+}
+
+func TestDockerRunProvidesOfficialCompilerMemory(t *testing.T) {
+	args := dockerRunArgs("imperative-go-assessment-0123456789abcdef01234567", "checkpoint/reactions", `C:\tmp\main.go`, nil)
+	foundMemory := false
+	foundTmpfs := false
+	for index, argument := range args {
+		switch argument {
+		case "--memory":
+			if index+1 >= len(args) {
+				t.Fatal("Docker run memory option has no value")
+			}
+			if args[index+1] != "1g" {
+				t.Fatalf("Docker run memory = %q, want 1g", args[index+1])
+			}
+			foundMemory = true
+		case "--tmpfs":
+			if index+1 < len(args) && args[index+1] == "/tmp:rw,exec,nosuid,nodev,size=512m,mode=1777" {
+				foundTmpfs = true
+			}
+		}
+	}
+	if !foundMemory {
+		t.Fatal("Docker run did not set an official compiler memory limit")
+	}
+	if !foundTmpfs {
+		t.Fatal("Docker run did not provide enough writable compiler workspace")
+	}
 }
 
 func TestStageOfficialResourcesAreReadableByLearner(t *testing.T) {

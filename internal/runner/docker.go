@@ -225,7 +225,9 @@ func decodeOfficialOutcome(level assessment.Level, stdout, stderr string) (execu
 		}
 	}
 	if len(outcome.results) == 0 {
-		return executionOutcome{}, errors.New("grader response contained no recognized checks")
+		outcome.status = executionRuntime
+		outcome.runtimeError = "The official grader did not return a result for the check."
+		return outcome, nil
 	}
 	if !envelope.OK {
 		outcome.status = executionRuntime
@@ -368,9 +370,9 @@ func dockerRunArgs(name, exerciseKey, sourcePath string, resourceMounts []docker
 	args := []string{
 		"run", "--name", name, "--label", dockerContainerLabel, "--rm", "--pull", "never",
 		"--platform", dockerPlatform, "--network", "none", "--ipc", "none", "--read-only", "--log-driver", "none", "--hostname", "grader",
-		"--memory", "512m", "--memory-swap", "512m", "--cpus", "1", "--pids-limit", "256",
+		"--memory", "1g", "--memory-swap", "1g", "--cpus", "1", "--pids-limit", "256",
 		"--ulimit", "nofile=256:256", "--ulimit", "core=0:0",
-		"--tmpfs", "/tmp:rw,exec,nosuid,nodev,size=256m,mode=1777",
+		"--tmpfs", "/tmp:rw,exec,nosuid,nodev,size=512m,mode=1777",
 		"--env", "EXERCISE=" + slug, "--env", "FILE=" + slug + "/main.go", "--env", "EMIT_JSON=1",
 		"--env", "GOCACHE=/tmp/go-build",
 	}
