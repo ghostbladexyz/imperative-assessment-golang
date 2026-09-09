@@ -52,6 +52,7 @@ type PaneSizes = {
 type ResizeKind = keyof PaneSizes;
 
 const PANE_SIZE_KEY = "imperative-go-assessment:pane-sizes:v2";
+const LEGACY_PANE_SIZE_KEY = "imperative-go-assessment:pane-sizes:v1";
 const TESTS_VISIBILITY_KEY = "imperative-go-assessment:tests-visible:v1";
 const DEFAULT_BRIEF_RATIO = 0.54;
 const BRIEF_MIN_WIDTH = 320;
@@ -59,6 +60,7 @@ const BRIEF_MAX_WIDTH = 760;
 const DEFAULT_TESTS_WIDTH = 480;
 const CONSOLE_MIN_WIDTH = 280;
 const TESTS_MIN_WIDTH = 280;
+const OUTPUT_MIN_HEIGHT = 160;
 const LAYOUT_HANDLE_WIDTH = 7;
 const DEFAULT_PANE_SIZES: PaneSizes = {
   brief: defaultBriefWidth(),
@@ -525,7 +527,7 @@ function App() {
       }
       return {
         ...current,
-        [kind]: Math.max(160, current[kind] + delta),
+        [kind]: Math.max(OUTPUT_MIN_HEIGHT, current[kind] + delta),
       };
     });
   };
@@ -1052,24 +1054,45 @@ function failedRun(
 
 function loadPaneSizes(): PaneSizes {
   try {
-    const saved = JSON.parse(localStorage.getItem(PANE_SIZE_KEY) ?? "");
+    const saved =
+      readStoredPaneSizes(PANE_SIZE_KEY) ??
+      readStoredPaneSizes(LEGACY_PANE_SIZE_KEY);
+    const tests = isFiniteNumber(saved?.tests)
+      ? Math.max(TESTS_MIN_WIDTH, Math.round(saved.tests))
+      : DEFAULT_PANE_SIZES.tests;
     return {
       brief:
-        typeof saved.brief === "number"
-          ? saved.brief
+        isFiniteNumber(saved?.brief)
+          ? clamp(
+              saved.brief,
+              BRIEF_MIN_WIDTH,
+              typeof window === "undefined"
+                ? BRIEF_MAX_WIDTH
+                : maxBriefWidth(window.innerWidth, tests, true),
+            )
           : DEFAULT_PANE_SIZES.brief,
       output:
-        typeof saved.output === "number"
-          ? saved.output
+        isFiniteNumber(saved?.output)
+          ? Math.max(OUTPUT_MIN_HEIGHT, Math.round(saved.output))
           : DEFAULT_PANE_SIZES.output,
-      tests:
-        typeof saved.tests === "number"
-          ? Math.max(TESTS_MIN_WIDTH, saved.tests)
-          : DEFAULT_PANE_SIZES.tests,
+      tests,
     };
   } catch {
     return DEFAULT_PANE_SIZES;
   }
+}
+
+function readStoredPaneSizes(key: string): Partial<PaneSizes> | null {
+  const raw = localStorage.getItem(key);
+  if (!raw) return null;
+  const saved: unknown = JSON.parse(raw);
+  return saved && typeof saved === "object"
+    ? (saved as Partial<PaneSizes>)
+    : null;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
 }
 
 function defaultBriefWidth(): number {
